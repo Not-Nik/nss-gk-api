@@ -20,6 +20,7 @@ mod exp;
 mod util;
 
 pub mod hash;
+pub mod hmac;
 pub mod p11;
 mod prio;
 mod ssl;
