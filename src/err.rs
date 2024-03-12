@@ -52,6 +52,7 @@ pub enum Error {
     StringError,
     TimeTravelError,
     UnsupportedCipher,
+    UnsupportedHash,
     UnsupportedVersion,
 }
 
@@ -128,8 +129,7 @@ pub fn is_blocked(result: &Res<()>) -> bool {
     }
 }
 
-pub trait IntoResult
-{
+pub trait IntoResult {
     /// The `Ok` type for the result.
     type Ok;
 
@@ -158,7 +158,7 @@ macro_rules! impl_into_result {
                 $crate::err::into_result(self)
             }
         }
-    }
+    };
 }
 
 impl IntoResult for SECStatus {
