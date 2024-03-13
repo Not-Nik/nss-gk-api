@@ -22,24 +22,32 @@ use crate::p11::SymKey;
 use crate::ssl::CK_OBJECT_HANDLE;
 // use crate::Error;
 // use crate::SECItemBorrowed;
+use crate::p11::CKA_DERIVE;
 use crate::p11::CKF_HKDF_SALT_DATA;
 use crate::p11::CKF_HKDF_SALT_NULL;
 use crate::p11::CKM_HKDF_DATA;
+use crate::p11::CKM_HKDF_DERIVE;
 use crate::p11::CK_BBOOL;
 use crate::p11::CK_INVALID_HANDLE;
 use crate::p11::CK_MECHANISM_TYPE;
-use pkcs11_bindings::CKA_DERIVE;
-use pkcs11_bindings::CKM_HKDF_DERIVE;
 // use crate::p11::CK_ULONG;
 use pkcs11_bindings::CK_ULONG;
 use std::convert::TryFrom;
 // use std::ptr;
 use std::ptr::null_mut;
 
-pub enum HKDFAlgorithm {
+pub enum HkdfAlgorithm {
     HKDF_SHA2_256,
     HKDF_SHA2_384,
     HKDF_SHA2_512,
+}
+
+fn hkdf_alg_to_p11_prf_hash_mechanism(alg: &HkdfAlgorithm) -> p11::CK_MECHANISM_TYPE {
+    match alg {
+        HkdfAlgorithm::HKDF_SHA2_256 => p11::CKM_SHA256.into(),
+        HkdfAlgorithm::HKDF_SHA2_384 => p11::CKM_SHA384.into(),
+        HkdfAlgorithm::HKDF_SHA2_512 => p11::CKM_SHA512.into(),
+    }
 }
 
 pub(crate) struct ParamItem<'a, T: 'a> {
@@ -65,21 +73,7 @@ impl<'a, T: Sized + 'a> ParamItem<'a, T> {
     }
 }
 
-fn expand_params(info: &[u8]) -> p11::CK_HKDF_PARAMS {
-    p11::CK_HKDF_PARAMS {
-        bExtract: CK_BBOOL::from(false),
-        bExpand: CK_BBOOL::from(true),
-        prfHashMechanism: CKM_HKDF_DERIVE,
-        ulSaltType: CK_ULONG::from(CKF_HKDF_SALT_NULL),
-        pSalt: null_mut(),
-        ulSaltLen: 0,
-        hSaltKey: CK_OBJECT_HANDLE::from(CK_INVALID_HANDLE),
-        pInfo: info.as_ptr() as *mut _, // const-cast = bad API
-        ulInfoLen: CK_ULONG::try_from(info.len()).unwrap(),
-    }
-}
-
-pub fn extract(salt: &[u8], ikm: &SymKey) -> Result<Vec<u8>, Error> {
+pub fn extract(alg: &HkdfAlgorithm, salt: &[u8], ikm: &SymKey) -> Result<Vec<u8>, Error> {
     let salt_type = if salt.is_empty() {
         CKF_HKDF_SALT_NULL
     } else {
@@ -88,7 +82,7 @@ pub fn extract(salt: &[u8], ikm: &SymKey) -> Result<Vec<u8>, Error> {
     let mut params = p11::CK_HKDF_PARAMS {
         bExtract: CK_BBOOL::from(true),
         bExpand: CK_BBOOL::from(false),
-        prfHashMechanism: CKM_HKDF_DERIVE,
+        prfHashMechanism: hkdf_alg_to_p11_prf_hash_mechanism(&alg),
         ulSaltType: CK_ULONG::from(salt_type),
         pSalt: salt.as_ptr() as *mut _, // const-cast = bad API
         ulSaltLen: CK_ULONG::try_from(salt.len()).unwrap(),
@@ -119,8 +113,27 @@ pub fn extract(salt: &[u8], ikm: &SymKey) -> Result<Vec<u8>, Error> {
     Ok(r)
 }
 
-pub fn expand_data(prk: &SymKey, info: &[u8], len: usize) -> Result<Vec<u8>, Error> {
-    let mut params = expand_params(info);
+fn expand_params(alg: &HkdfAlgorithm, info: &[u8]) -> p11::CK_HKDF_PARAMS {
+    p11::CK_HKDF_PARAMS {
+        bExtract: CK_BBOOL::from(false),
+        bExpand: CK_BBOOL::from(true),
+        prfHashMechanism: hkdf_alg_to_p11_prf_hash_mechanism(&alg),
+        ulSaltType: CK_ULONG::from(CKF_HKDF_SALT_NULL),
+        pSalt: null_mut(),
+        ulSaltLen: 0,
+        hSaltKey: CK_OBJECT_HANDLE::from(CK_INVALID_HANDLE),
+        pInfo: info.as_ptr() as *mut _, // const-cast = bad API
+        ulInfoLen: CK_ULONG::try_from(info.len()).unwrap(),
+    }
+}
+
+pub fn expand(
+    alg: &HkdfAlgorithm,
+    prk: &SymKey,
+    info: &[u8],
+    len: usize,
+) -> Result<Vec<u8>, Error> {
+    let mut params = expand_params(&alg, info);
     let mut params_item = ParamItem::new(&mut params);
     let ptr = unsafe {
         p11::PK11_Derive(
