@@ -148,6 +148,9 @@ variables = [
 
 [nss_p11]
 types = [
+    "CK_BBOOL",
+    # "CK_ULONG", // Uncommenting this breaks nss_ssl bindings
+    "CK_HKDF_PARAMS",
     "CERTCertList",
     "CERTCertListNode",
     "HpkeAeadId",
@@ -161,6 +164,7 @@ functions = [
     "PK11_CipherOp",
     "PK11_CreateContextBySymKey",
     "PK11_Decrypt",
+    "PK11_Derive",
     "PK11_DestroyContext",
     "PK11_DigestOp",
     "PK11_DigestFinal",
@@ -229,6 +233,10 @@ variables = [
     "SHA3_256_LENGTH",
     "SHA3_384_LENGTH",
     "SHA3_512_LENGTH",
+    "CK_INVALID_HANDLE",
+    "CKF_HKDF_SALT_NULL",
+    "CKF_HKDF_SALT_DATA",
+    "CKM_HKDF_DATA"
 ]
 
 [nspr_err]

@@ -20,9 +20,6 @@ pub enum HashAlgorithm {
     SHA2_256,
     SHA2_384,
     SHA2_512,
-    SHA3_256,
-    SHA3_384,
-    SHA3_512,
 }
 
 fn hash_alg_to_oid(alg: &HashAlgorithm) -> Result<SECOidTag::Type, Error> {
@@ -30,9 +27,6 @@ fn hash_alg_to_oid(alg: &HashAlgorithm) -> Result<SECOidTag::Type, Error> {
         HashAlgorithm::SHA2_256 => Ok(SECOidTag::SEC_OID_SHA256),
         HashAlgorithm::SHA2_384 => Ok(SECOidTag::SEC_OID_SHA384),
         HashAlgorithm::SHA2_512 => Ok(SECOidTag::SEC_OID_SHA512),
-        HashAlgorithm::SHA3_256 => Ok(SECOidTag::SEC_OID_SHA3_256),
-        HashAlgorithm::SHA3_384 => Ok(SECOidTag::SEC_OID_SHA3_384),
-        HashAlgorithm::SHA3_512 => Ok(SECOidTag::SEC_OID_SHA3_512),
     }
 }
 
@@ -41,9 +35,6 @@ pub fn hash_alg_to_hash_len(alg: &HashAlgorithm) -> Result<usize, Error> {
         HashAlgorithm::SHA2_256 => Ok(p11::SHA256_LENGTH as usize),
         HashAlgorithm::SHA2_384 => Ok(p11::SHA384_LENGTH as usize),
         HashAlgorithm::SHA2_512 => Ok(p11::SHA512_LENGTH as usize),
-        HashAlgorithm::SHA3_256 => Ok(p11::SHA3_256_LENGTH as usize),
-        HashAlgorithm::SHA3_384 => Ok(p11::SHA3_384_LENGTH as usize),
-        HashAlgorithm::SHA3_512 => Ok(p11::SHA3_512_LENGTH as usize),
     }
 }
 

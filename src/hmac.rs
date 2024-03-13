@@ -31,9 +31,6 @@ pub enum HmacAlgorithm {
     HMAC_SHA2_256,
     HMAC_SHA2_384,
     HMAC_SHA2_512,
-    HMAC_SHA3_256,
-    HMAC_SHA3_384,
-    HMAC_SHA3_512,
 }
 
 fn hmac_alg_to_ckm(alg: &HmacAlgorithm) -> Result<u64, Error> {
@@ -41,9 +38,6 @@ fn hmac_alg_to_ckm(alg: &HmacAlgorithm) -> Result<u64, Error> {
         HmacAlgorithm::HMAC_SHA2_256 => Ok(pkcs11_bindings::CKM_SHA256_HMAC),
         HmacAlgorithm::HMAC_SHA2_384 => Ok(pkcs11_bindings::CKM_SHA384_HMAC),
         HmacAlgorithm::HMAC_SHA2_512 => Ok(pkcs11_bindings::CKM_SHA512_HMAC),
-        HmacAlgorithm::HMAC_SHA3_256 => Ok(pkcs11_bindings::CKM_SHA3_256_HMAC),
-        HmacAlgorithm::HMAC_SHA3_384 => Ok(pkcs11_bindings::CKM_SHA3_384_HMAC),
-        HmacAlgorithm::HMAC_SHA3_512 => Ok(pkcs11_bindings::CKM_SHA3_512_HMAC),
     }
 }
 
@@ -52,9 +46,6 @@ fn hmac_alg_to_hash_alg(alg: &HmacAlgorithm) -> Result<HashAlgorithm, Error> {
         HmacAlgorithm::HMAC_SHA2_256 => Ok(HashAlgorithm::SHA2_256),
         HmacAlgorithm::HMAC_SHA2_384 => Ok(HashAlgorithm::SHA2_384),
         HmacAlgorithm::HMAC_SHA2_512 => Ok(HashAlgorithm::SHA2_512),
-        HmacAlgorithm::HMAC_SHA3_256 => Ok(HashAlgorithm::SHA3_256),
-        HmacAlgorithm::HMAC_SHA3_384 => Ok(HashAlgorithm::SHA3_384),
-        HmacAlgorithm::HMAC_SHA3_512 => Ok(HashAlgorithm::SHA3_512),
     }
 }
 
