@@ -100,6 +100,8 @@ impl Hkdf {
     }
 
     pub fn import_secret(&self, ikm: &[u8]) -> Result<SymKey, HkdfError> {
+        crate::init();
+
         let slot = p11::Slot::internal().map_err(|_| HkdfError::InternalError)?;
         let ptr = unsafe {
             p11::PK11_ImportSymKey(
@@ -125,6 +127,8 @@ impl Hkdf {
     }
 
     pub fn extract(&self, salt: &[u8], ikm: &SymKey) -> Result<SymKey, HkdfError> {
+        crate::init();
+
         let salt_type = if salt.is_empty() {
             CKF_HKDF_SALT_NULL
         } else {
@@ -178,6 +182,8 @@ impl Hkdf {
         info: &[u8],
         key_mech: KeyMechanism,
     ) -> Result<SymKey, HkdfError> {
+        crate::init();
+
         let mut params = self.expand_params(info);
         let mut params_item = ParamItem::new(&mut params);
         let ptr = unsafe {
@@ -195,6 +201,8 @@ impl Hkdf {
     }
 
     pub fn expand_data(&self, prk: &SymKey, info: &[u8], len: usize) -> Result<Vec<u8>, HkdfError> {
+        crate::init();
+
         let mut params = self.expand_params(info);
         let mut params_item = ParamItem::new(&mut params);
         let ptr = unsafe {
