@@ -41,7 +41,7 @@ fn hmac_alg_to_ckm(alg: &HmacAlgorithm) -> Result<u64, Error> {
     }
 }
 
-fn hmac_alg_to_hash_alg(alg: &HmacAlgorithm) -> Result<HashAlgorithm, Error> {
+pub fn hmac_alg_to_hash_alg(alg: &HmacAlgorithm) -> Result<HashAlgorithm, Error> {
     match alg {
         HmacAlgorithm::HMAC_SHA2_256 => Ok(HashAlgorithm::SHA2_256),
         HmacAlgorithm::HMAC_SHA2_384 => Ok(HashAlgorithm::SHA2_384),
@@ -49,7 +49,7 @@ fn hmac_alg_to_hash_alg(alg: &HmacAlgorithm) -> Result<HashAlgorithm, Error> {
     }
 }
 
-fn hmac_alg_to_hmac_len(alg: &HmacAlgorithm) -> Result<usize, Error> {
+pub fn hmac_alg_to_hmac_len(alg: &HmacAlgorithm) -> Result<usize, Error> {
     let hash_alg = hmac_alg_to_hash_alg(&alg)?;
     hash::hash_alg_to_hash_len(&hash_alg)
 }
