@@ -21,6 +21,8 @@ use crate::p11::CK_INVALID_HANDLE;
 use crate::p11::CK_MECHANISM_TYPE;
 use crate::ssl::CK_OBJECT_HANDLE;
 
+use crate::SECItemBorrowed;
+
 use pkcs11_bindings::CKA_SIGN;
 use pkcs11_bindings::CKM_HKDF_KEY_GEN;
 use pkcs11_bindings::CK_ULONG;
@@ -103,14 +105,16 @@ impl Hkdf {
         crate::init();
 
         let slot = p11::Slot::internal().map_err(|_| HkdfError::InternalError)?;
+        let ikm_item = SECItemBorrowed::wrap(ikm);
+        let ikm_item_ptr = ikm_item.as_ref() as *const _ as *mut _;
+
         let ptr = unsafe {
             p11::PK11_ImportSymKey(
                 *slot,
                 CK_MECHANISM_TYPE::from(CKM_HKDF_KEY_GEN),
                 p11::PK11Origin::PK11_OriginUnwrap,
                 p11::CK_ATTRIBUTE_TYPE::from(CKA_SIGN),
-                // &mut p11::Item::wrap(ikm),
-                ikm.as_ptr() as *mut _,
+                ikm_item_ptr,
                 null_mut(),
             )
         };
