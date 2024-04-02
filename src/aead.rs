@@ -1,14 +1,3 @@
-// use super::{
-//     err::secstatus_to_res,
-//     p11::{
-//         sys::{
-//             self, PK11Context, PK11_AEADOp, PK11_CreateContextBySymKey, PRBool, CKA_DECRYPT,
-//             CKA_ENCRYPT, CKA_NSS_MESSAGE, CKG_GENERATE_COUNTER_XOR, CKG_NO_GENERATE, CKM_AES_GCM,
-//             CKM_CHACHA20_POLY1305, CK_ATTRIBUTE_TYPE, CK_GENERATOR_FUNCTION, CK_MECHANISM_TYPE,
-//         },
-//         Item, SymKey,
-//     },
-// };
 use crate::p11::Context;
 use crate::p11::{
     self, PK11_AEADOp, PK11_CreateContextBySymKey, CKA_DECRYPT, CKA_ENCRYPT, CKA_NSS_MESSAGE,
@@ -22,13 +11,6 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::mem;
 use std::os::raw::c_int;
-
-//use log::trace;
-// use std::{
-//     convert::{TryFrom, TryInto},
-//     mem,
-//     os::raw::c_int,
-// };
 
 /// All the nonces are the same length.  Exploit that.
 pub const NONCE_LEN: usize = 12;
@@ -49,10 +31,6 @@ where
     l.try_into().unwrap()
 }
 
-// unsafe fn destroy_aead_context(ctx: *mut PK11Context) {
-//     p11::PK11_DestroyContext(ctx, PRBool::from(true));
-// }
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Encrypt,
@@ -71,6 +49,7 @@ impl Mode {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AeadAlgorithms {
     Aes128Gcm,
     Aes256Gcm,
@@ -93,16 +72,19 @@ impl Aead {
         })
     }
 
-    #[cfg(test)]
     pub fn import_key(algorithm: AeadAlgorithms, key: &[u8]) -> Result<SymKey, Error> {
-        let slot = super::p11::Slot::internal()?;
+        let slot = p11::Slot::internal().map_err(|_| crate::Error::InternalError)?;
+
+        let key_item = SECItemBorrowed::wrap(key);
+        let key_item_ptr = key_item.as_ref() as *const _ as *mut _;
+
         let ptr = unsafe {
             p11::PK11_ImportSymKey(
                 *slot,
                 Self::mech(algorithm),
                 p11::PK11Origin::PK11_OriginUnwrap,
                 p11::CK_ATTRIBUTE_TYPE::from(p11::CKA_ENCRYPT | p11::CKA_DECRYPT),
-                SECItemBorrowed::wrap(key).as_mut(),
+                key_item_ptr,
                 std::ptr::null_mut(),
             )
         };
@@ -115,6 +97,8 @@ impl Aead {
         key: &SymKey,
         nonce_base: [u8; NONCE_LEN],
     ) -> Result<Self, crate::Error> {
+        crate::init();
+
         // trace!(
         //     "New AEAD: key={} nonce_base={}",
         //     hex::encode(key.key_data()?),
@@ -137,6 +121,8 @@ impl Aead {
     }
 
     pub fn seal(&mut self, aad: &[u8], pt: &[u8]) -> Result<Vec<u8>, crate::Error> {
+        crate::init();
+
         assert_eq!(self.mode, Mode::Encrypt);
         // A copy for the nonce generator to write into.  But we don't use the value.
         let mut nonce = self.nonce_base;
@@ -176,6 +162,8 @@ impl Aead {
         seq: SequenceNumber,
         ct: &[u8],
     ) -> Result<Vec<u8>, crate::Error> {
+        crate::init();
+
         assert_eq!(self.mode, Mode::Decrypt);
         let mut nonce = self.nonce_base;
         for (i, n) in nonce.iter_mut().rev().take(COUNTER_LEN).enumerate() {
