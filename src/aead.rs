@@ -94,7 +94,7 @@ impl Aead {
     }
 
     #[cfg(test)]
-    pub fn import_key(algorithm: AeadAlgorithms, key: &[u8]) -> Result<SymKey, AeadError> {
+    pub fn import_key(algorithm: AeadAlgorithms, key: &[u8]) -> Result<SymKey, Error> {
         let slot = super::p11::Slot::internal()?;
         let ptr = unsafe {
             p11::PK11_ImportSymKey(
@@ -102,7 +102,7 @@ impl Aead {
                 Self::mech(algorithm),
                 p11::PK11Origin::PK11_OriginUnwrap,
                 p11::CK_ATTRIBUTE_TYPE::from(p11::CKA_ENCRYPT | p11::CKA_DECRYPT),
-                &mut super::p11::Item::wrap(key),
+                SECItemBorrowed::wrap(key).as_mut(),
                 std::ptr::null_mut(),
             )
         };
@@ -211,15 +211,12 @@ impl Aead {
 
 #[cfg(test)]
 mod test {
-    use super::{
-        super::{super::hpke::Aead as AeadId, init},
-        Aead, Mode, SequenceNumber, NONCE_LEN,
-    };
+    use super::{super::init, Aead, AeadAlgorithms, Mode, SequenceNumber, NONCE_LEN};
 
     /// Check that the first invocation of encryption matches expected values.
     /// Also check decryption of the same.
     fn check0(
-        algorithm: AeadId,
+        algorithm: AeadAlgorithms,
         key: &[u8],
         nonce: &[u8; NONCE_LEN],
         aad: &[u8],
@@ -239,7 +236,7 @@ mod test {
     }
 
     fn decrypt(
-        algorithm: AeadId,
+        algorithm: AeadAlgorithms,
         key: &[u8],
         nonce: &[u8; NONCE_LEN],
         seq: SequenceNumber,
@@ -273,12 +270,12 @@ mod test {
             0x04, 0xa2, 0x65, 0xba, 0x2e, 0xff, 0x4d, 0x82, 0x90, 0x58, 0xfb, 0x3f, 0x0f, 0x24,
             0x96, 0xba,
         ];
-        check0(AeadId::Aes128Gcm, KEY, NONCE, AAD, &[], CT);
+        check0(AeadAlgorithms::Aes128Gcm, KEY, NONCE, AAD, &[], CT);
     }
 
     #[test]
     fn quic_server_initial() {
-        const ALG: AeadId = AeadId::Aes128Gcm;
+        const ALG: AeadAlgorithms = AeadAlgorithms::Aes128Gcm;
         const KEY: &[u8] = &[
             0xcf, 0x3a, 0x53, 0x31, 0x65, 0x3c, 0x36, 0x4c, 0x88, 0xf0, 0xf3, 0x79, 0xb6, 0x06,
             0x7e, 0x37,
@@ -322,7 +319,7 @@ mod test {
 
     #[test]
     fn quic_chacha() {
-        const ALG: AeadId = AeadId::ChaCha20Poly1305;
+        const ALG: AeadAlgorithms = AeadAlgorithms::ChaCha20Poly1305;
         const KEY: &[u8] = &[
             0xc6, 0xd9, 0x8f, 0xf3, 0x44, 0x1c, 0x3f, 0xe1, 0xb2, 0x18, 0x20, 0x94, 0xf6, 0x9c,
             0xaa, 0x2e, 0xd4, 0xb7, 0x16, 0xb6, 0x54, 0x88, 0x96, 0x0a, 0x7a, 0x98, 0x49, 0x79,
