@@ -32,6 +32,7 @@ pub type Res<T> = Result<T, Error>;
 #[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum Error {
     AeadError,
+    AeadTruncated,
     CertificateLoading,
     CipherInitFailure,
     CreateSslSocket,

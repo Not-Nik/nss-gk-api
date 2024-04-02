@@ -19,6 +19,7 @@ mod exp;
 #[macro_use]
 mod util;
 
+pub mod aead;
 pub mod hash;
 pub mod hkdf;
 pub mod hmac;
@@ -66,6 +67,7 @@ pub const PR_TRUE: PRBool = prtypes::PR_TRUE as PRBool;
 enum NssLoaded {
     External,
     NoDb,
+    #[allow(dead_code)]
     Db(Box<Path>),
 }
 
