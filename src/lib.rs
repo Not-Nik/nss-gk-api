@@ -20,6 +20,7 @@ mod exp;
 mod util;
 
 pub mod aead;
+pub mod der;
 pub mod hash;
 pub mod hkdf;
 pub mod hmac;

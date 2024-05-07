@@ -41,6 +41,7 @@ pub enum Error {
     InternalError,
     IntegerOverflow,
     InvalidEpoch,
+    InvalidInput,
     MixedHandshakeMethod,
     NoDataAvailable,
     NssError {
@@ -53,6 +54,7 @@ pub enum Error {
     StringError,
     TimeTravelError,
     UnsupportedCipher,
+    UnsupportedCurve,
     UnsupportedHash,
     UnsupportedVersion,
 }
