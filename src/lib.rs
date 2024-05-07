@@ -21,6 +21,7 @@ mod util;
 
 pub mod aead;
 pub mod der;
+pub mod ec;
 pub mod hash;
 pub mod hkdf;
 pub mod hmac;
