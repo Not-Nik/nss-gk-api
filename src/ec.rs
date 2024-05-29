@@ -110,6 +110,9 @@ fn ec_curve_to_ckm(alg: &EcCurve) -> pkcs11_bindings::CK_MECHANISM_TYPE {
 // Curve functions
 //
 
+// pub type EcPublicKey: Vec<u8>;
+// pub type EcPrivateKey: Vec<u8>;
+
 pub fn keygen(alg: EcCurve) -> Result<(PrivateKey, PublicKey), crate::Error> {
     init();
 
