@@ -41,15 +41,20 @@ pub enum EcCurve {
 pub type EcdhPublicKey = PublicKey;
 pub type EcdhPrivateKey = PrivateKey;
 
+pub struct EcdhKeypair {
+    pub public: EcdhPublicKey,
+    pub private: EcdhPrivateKey,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Ecdh(EcCurve);
 
 impl Ecdh {
-    pub fn new(&self) -> Self {
-        return self.clone();
+    pub fn new(&self, curve: EcCurve) -> Self {
+        Self(curve)
     }
 
-    pub fn keygen(&self, curve: EcCurve) -> Result<(EcdhPrivateKey, EcdhPublicKey), crate::Error> {
+    pub fn generate_keypair(&self, curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
         return ecdh_keygen(curve);
     }
 }
@@ -129,17 +134,17 @@ fn ec_curve_to_ckm(alg: &EcCurve) -> pkcs11_bindings::CK_MECHANISM_TYPE {
 // Curve functions
 //
 
-fn ecdh_keygen(alg: EcCurve) -> Result<(EcdhPrivateKey, EcdhPublicKey), crate::Error> {
+fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
     init();
 
     // Get the OID for the Curve
-    let curve_oid = ec_curve_to_oid(&alg)?;
+    let curve_oid = ec_curve_to_oid(&curve)?;
     let oid_bytes = object_id(&curve_oid)?;
     let mut oid = SECItemBorrowed::wrap(&oid_bytes);
     let oid_ptr: *mut SECItem = oid.as_mut();
 
     // Get the Mechanism based on the Curve and its use
-    let ckm = ec_curve_to_ckm(&alg);
+    let ckm = ec_curve_to_ckm(&curve);
 
     // Get the PKCS11 slot
     let slot = Slot::internal()?;
@@ -166,6 +171,11 @@ fn ecdh_keygen(alg: EcCurve) -> Result<(EcdhPrivateKey, EcdhPublicKey), crate::E
 
         let pk = EcdhPublicKey::from_ptr(pk_ptr)?;
 
-        Ok((sk, pk))
+        let kp = EcdhKeypair {
+            public: pk,
+            private: sk,
+        };
+
+        Ok(kp)
     }
 }
