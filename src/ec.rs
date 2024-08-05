@@ -7,8 +7,11 @@
 use crate::der;
 use crate::err::IntoResult;
 use crate::init;
+use crate::p11::PK11_ExportDERPrivateKeyInfo;
+use crate::p11::PK11_ImportDERPrivateKeyInfoAndReturnKey;
 use crate::Error;
 
+use std::default;
 use std::ptr;
 
 use crate::p11::PK11_GenerateKeyPairWithOpFlags;
@@ -16,6 +19,8 @@ use crate::p11::Slot;
 use crate::p11::PK11_ATTR_EXTRACTABLE;
 use crate::p11::PK11_ATTR_INSENSITIVE;
 use crate::p11::PK11_ATTR_SESSION;
+use crate::p11::KU_ALL;
+
 use crate::PrivateKey;
 use crate::PublicKey;
 use crate::SECItem;
@@ -89,22 +94,6 @@ pub const OID_X25519_BYTES: &[u8] = &[
     0x2b, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01,
 ];
 
-pub const OID_ED35519_BYTES: &[u8] = &[
-    /*
-        https://oid-rep.orange-labs.fr/get/1.3.101.112
-        A.1.  ASN.1 Object for Ed25519
-        id-Ed25519 OBJECT IDENTIFIER ::= { 1.3.101.112 }
-        Parameters are absent.  Length is 7 bytes.
-        Binary encoding: 3005 0603 2B65 70
-
-        The same algorithm identifiers are used for identifying a public key,
-        a private key, and a signature (for the two EdDSA related OIDs).
-        Additional encoding information is provided below for each of these
-        locations.
-    */
-    0x2B, 0x65, 0x70,
-];
-
 pub fn object_id(val: &[u8]) -> Result<Vec<u8>, Error> {
     let mut out = Vec::with_capacity(der::MAX_TAG_AND_LENGTH_BYTES + val.len());
     der::write_tag_and_length(&mut out, der::TAG_OBJECT_ID, val.len())?;
@@ -134,7 +123,7 @@ fn ec_curve_to_ckm(alg: &EcCurve) -> pkcs11_bindings::CK_MECHANISM_TYPE {
 // Curve functions
 //
 
-fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
+pub fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
     init();
 
     // Get the OID for the Curve
@@ -177,5 +166,42 @@ fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
         };
 
         Ok(kp)
+    }
+}
+
+pub fn export_ec_private_key(key: PrivateKey) -> Result<Vec<u8>, Error>
+{
+    init();
+    unsafe {
+        let sk: crate::ScopedSECItem = PK11_ExportDERPrivateKeyInfo(*key, ptr::null_mut()).into_result()?;
+        return Ok(sk.into_vec())
+    }
+}
+
+pub fn import_ec_private_key(pki: &[u8]) -> Result<PrivateKey, Error>
+{
+    init();
+
+    // Get the PKCS11 slot
+    let slot = Slot::internal()?;
+    let mut der_pki = SECItemBorrowed::wrap(&pki);
+    let der_pki_ptr: *mut SECItem = der_pki.as_mut();
+
+    // Create a pointer for the private key
+    let mut pk_ptr = ptr::null_mut();
+
+    unsafe {
+        let r = PK11_ImportDERPrivateKeyInfoAndReturnKey(
+            *slot, 
+            der_pki_ptr, 
+            ptr::null_mut(), 
+            ptr::null_mut(), 
+            0, 
+            0, 
+            KU_ALL, 
+            &mut pk_ptr, 
+            ptr::null_mut());
+        let sk = EcdhPrivateKey::from_ptr(pk_ptr)?;
+        Ok(sk)
     }
 }
