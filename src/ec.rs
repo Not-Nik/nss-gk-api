@@ -4,14 +4,16 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+
+
 use crate::der;
 use crate::err::IntoResult;
 use crate::init;
 use crate::p11::PK11_ExportDERPrivateKeyInfo;
 use crate::p11::PK11_ImportDERPrivateKeyInfoAndReturnKey;
+// use crate::p11::SECKEY_CreateSubjectPublicKeyInfo;
 use crate::Error;
 
-use std::default;
 use std::ptr;
 
 use crate::p11::PK11_GenerateKeyPairWithOpFlags;
@@ -25,6 +27,7 @@ use crate::PrivateKey;
 use crate::PublicKey;
 use crate::SECItem;
 use crate::SECItemBorrowed;
+
 use pkcs11_bindings::CKF_DERIVE;
 use pkcs11_bindings::CKM_EC_EDWARDS_KEY_PAIR_GEN;
 use pkcs11_bindings::CKM_EC_KEY_PAIR_GEN;
@@ -169,7 +172,7 @@ pub fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
     }
 }
 
-pub fn export_ec_private_key(key: PrivateKey) -> Result<Vec<u8>, Error>
+pub fn export_ec_private_key_pkcs8(key: PrivateKey) -> Result<Vec<u8>, Error>
 {
     init();
     unsafe {
@@ -178,7 +181,7 @@ pub fn export_ec_private_key(key: PrivateKey) -> Result<Vec<u8>, Error>
     }
 }
 
-pub fn import_ec_private_key(pki: &[u8]) -> Result<PrivateKey, Error>
+pub fn import_ec_private_key_pkcs8(pki: &[u8]) -> Result<PrivateKey, Error>
 {
     init();
 
@@ -202,6 +205,25 @@ pub fn import_ec_private_key(pki: &[u8]) -> Result<PrivateKey, Error>
             &mut pk_ptr, 
             ptr::null_mut());
         let sk = EcdhPrivateKey::from_ptr(pk_ptr)?;
-        Ok(sk)
+        match r
+        {
+            0 => Ok(sk),
+            _ => Err(Error::InvalidInput)
+        }
     }
 }
+
+
+// // I think it should be like this: 
+// pub fn export_ec_public_key_spki(key: PublicKey)
+// {
+//     unsafe{
+
+//     let a = SECKEY_CreateSubjectPublicKeyInfo(*key);
+//     // let template = CERT_SubjectPublicKeyInfoTemplate; 
+//     // let encoded = SEC_ASN1EncodeItem();
+
+//     }
+
+
+// }
