@@ -5,13 +5,16 @@
 // except according to those terms.
 
 use crate::der;
+use crate::err::into_result;
 use crate::err::IntoResult;
+use crate::err::Res;
 use crate::init;
 use crate::p11::PK11ObjectType;
 use crate::p11::PK11ObjectType::PK11_TypePrivKey;
 use crate::p11::PK11ObjectType::PK11_TypePubKey;
 use crate::p11::PK11_ExportDERPrivateKeyInfo;
 use crate::p11::PK11_ImportDERPrivateKeyInfoAndReturnKey;
+use crate::p11::PK11_PubDeriveWithKDF;
 use crate::p11::PK11_ReadRawAttribute;
 use crate::p11::PK11_WriteRawAttribute;
 use crate::Error;
@@ -299,7 +302,7 @@ pub fn export_ec_public_key_from_raw(key: PublicKey) -> Result<Vec<u8>, Error> {
     Ok(key_item.as_slice().to_owned())
 }
 
-// This is not gonna work. 
+// This is not gonna work.
 // Attribute CKA_VALUE is private
 pub fn import_ec_private_key_from_raw(key: &[u8]) -> Result<PrivateKey, Error> {
     init();
@@ -359,4 +362,33 @@ pub fn export_ec_private_key_from_raw(key: PrivateKey) -> Result<Vec<u8>, Error>
         )
     };
     Ok(key_item.as_slice().to_owned())
+}
+
+pub fn ecdh(sk: PrivateKey, pk: PublicKey) -> Result<PublicKey, Error> {
+    unsafe {
+        let k: *mut crate::p11::PK11SymKeyStr = PK11_PubDeriveWithKDF(
+            sk.cast(),
+            pk.cast(),
+            0,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            pkcs11_bindings::CKM_ECDH1_DERIVE,
+            pkcs11_bindings::CKM_SHA512_HMAC,
+            pkcs11_bindings::CKA_SIGN,
+            0,
+            pkcs11_bindings::CKD_NULL ,
+            ptr::null_mut(),
+            ptr::null_mut()
+        );
+    };
+    Err(Error::InvalidInput)
+}
+
+
+pub fn convert_to_public(sk:PrivateKey) -> Result<PublicKey, Error>
+{
+    unsafe {
+        let pk = crate::p11::SECKEY_ConvertToPublicKey(*sk).into_result()?;
+        Ok(pk)
+    }
 }
