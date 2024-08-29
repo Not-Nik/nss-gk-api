@@ -18,13 +18,16 @@ use crate::p11::PK11_WriteRawAttribute;
 use crate::Error;
 use pkcs11_bindings::CKA_EC_POINT;
 use pkcs11_bindings::CKA_VALUE;
+use pkcs11_bindings::CK_FALSE;
 
 use crate::util::SECItemMut;
 
+use std::convert::TryInto;
 use std::ptr;
 // use std::ptr::null;
 // use std::ptr::null_mut;
 
+use crate::p11::PK11_GenerateKeyPair;
 use crate::p11::PK11_GenerateKeyPairWithOpFlags;
 use crate::p11::Slot;
 use crate::p11::KU_ALL;
@@ -155,20 +158,31 @@ pub fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
 
     // https://github.com/mozilla/nss-gk-api/issues/1
     unsafe {
-        let sk =
-            // Type of `param` argument depends on mechanism. For EC keygen it is
-            // `SECKEYECParams *` which is a typedef for `SECItem *`.
-            PK11_GenerateKeyPairWithOpFlags(
-                *slot,
-                ckm,
-                oid_ptr.cast(),
-                &mut pk_ptr,
-                PK11_ATTR_EXTRACTABLE | PK11_ATTR_INSENSITIVE | PK11_ATTR_SESSION,
-                CKF_DERIVE,
-                CKF_DERIVE,
-                ptr::null_mut(),
-            )
-            .into_result()?;
+        // let sk =
+        //     // Type of `param` argument depends on mechanism. For EC keygen it is
+        //     // `SECKEYECParams *` which is a typedef for `SECItem *`.
+        //     PK11_GenerateKeyPairWithOpFlags(
+        //         *slot,
+        //         ckm,
+        //         oid_ptr.cast(),
+        //         &mut pk_ptr,
+        //         PK11_ATTR_EXTRACTABLE | PK11_ATTR_INSENSITIVE | PK11_ATTR_SESSION,
+        //         CKF_DERIVE,
+        //         CKF_DERIVE,
+        //         ptr::null_mut(),
+        //     )
+        //     .into_result()?;
+
+        let sk = PK11_GenerateKeyPair(
+            *slot,
+            ckm,
+            oid_ptr.cast(),
+            &mut pk_ptr,
+            CK_FALSE.into(),
+            CK_FALSE.into(),
+            ptr::null_mut(),
+        )
+        .into_result()?;
 
         let pk = EcdhPublicKey::from_ptr(pk_ptr)?;
 
@@ -221,9 +235,8 @@ pub fn import_ec_private_key_pkcs8(pki: &[u8]) -> Result<PrivateKey, Error> {
     }
 }
 
-pub fn import_ec_public_key_from_raw(key: &[u8]) -> Result<PublicKey, Error> {
+pub fn import_ec_public_key_from_raw(key: &[u8], curve: EcCurve) -> Result<PublicKey, Error> {
     init();
-    let curve = EcCurve::P256;
 
     // Get the OID for the Curve
     let curve_oid = ec_curve_to_oid(&curve)?;
@@ -245,14 +258,13 @@ pub fn import_ec_public_key_from_raw(key: &[u8]) -> Result<PublicKey, Error> {
         let _sk =
             // Type of `param` argument depends on mechanism. For EC keygen it is
             // `SECKEYECParams *` which is a typedef for `SECItem *`.
-            PK11_GenerateKeyPairWithOpFlags(
+            PK11_GenerateKeyPair(
                 *slot,
                 ckm,
                 oid_ptr.cast(),
                 &mut pk_ptr,
-                PK11_ATTR_EXTRACTABLE | PK11_ATTR_INSENSITIVE | PK11_ATTR_SESSION,
-                CKF_DERIVE,
-                CKF_DERIVE,
+                CK_FALSE.into(),
+                CK_FALSE.into(),
                 ptr::null_mut(),
             )
             .into_result()?;
@@ -309,14 +321,13 @@ pub fn import_ec_private_key_from_raw(key: &[u8]) -> Result<PrivateKey, Error> {
         let sk =
             // Type of `param` argument depends on mechanism. For EC keygen it is
             // `SECKEYECParams *` which is a typedef for `SECItem *`.
-            PK11_GenerateKeyPairWithOpFlags(
+            PK11_GenerateKeyPair(
                 *slot,
                 ckm,
                 oid_ptr.cast(),
                 &mut pk_ptr,
-                PK11_ATTR_EXTRACTABLE | PK11_ATTR_INSENSITIVE | PK11_ATTR_SESSION,
-                CKF_DERIVE,
-                CKF_DERIVE,
+                CK_FALSE.into(),
+                CK_FALSE.into(),
                 ptr::null_mut(),
             )
             .into_result()?;
@@ -357,11 +368,12 @@ pub fn ecdh(sk: PrivateKey, pk: PublicKey) -> Result<Vec<u8>, Error> {
             pkcs11_bindings::CKM_SHA512_HMAC,
             pkcs11_bindings::CKA_SIGN,
             0,
-            pkcs11_bindings::CKD_NULL ,
+            pkcs11_bindings::CKD_NULL,
             ptr::null_mut(),
-            ptr::null_mut()
-        ).into_result().unwrap();
-
+            ptr::null_mut(),
+        )
+        .into_result()
+        .unwrap();
 
         crate::p11::PK11_ExtractKeyValue(k.as_mut().unwrap());
 
@@ -371,9 +383,7 @@ pub fn ecdh(sk: PrivateKey, pk: PublicKey) -> Result<Vec<u8>, Error> {
     }
 }
 
-
-pub fn convert_to_public(sk:PrivateKey) -> Result<PublicKey, Error>
-{
+pub fn convert_to_public(sk: PrivateKey) -> Result<PublicKey, Error> {
     unsafe {
         let pk = crate::p11::SECKEY_ConvertToPublicKey(*sk).into_result()?;
         Ok(pk)
