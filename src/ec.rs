@@ -5,9 +5,7 @@
 // except according to those terms.
 
 use crate::der;
-use crate::err::into_result;
 use crate::err::IntoResult;
-use crate::err::Res;
 use crate::init;
 use crate::p11::PK11ObjectType;
 use crate::p11::PK11ObjectType::PK11_TypePrivKey;
@@ -244,7 +242,7 @@ pub fn import_ec_public_key_from_raw(key: &[u8]) -> Result<PublicKey, Error> {
 
     // https://github.com/mozilla/nss-gk-api/issues/1
     let ecdh_keypair = unsafe {
-        let sk =
+        let _sk =
             // Type of `param` argument depends on mechanism. For EC keygen it is
             // `SECKEYECParams *` which is a typedef for `SECItem *`.
             PK11_GenerateKeyPairWithOpFlags(
@@ -259,10 +257,6 @@ pub fn import_ec_public_key_from_raw(key: &[u8]) -> Result<PublicKey, Error> {
             )
             .into_result()?;
 
-        // println!("\n \n \n Generated Key (private)");
-        // for x in key {
-        //     print!("{:#04x}  ",x);
-        // }
         PK11_WriteRawAttribute(
             PK11_TypePubKey,
             pk_ptr.to_owned().cast(),
@@ -270,21 +264,8 @@ pub fn import_ec_public_key_from_raw(key: &[u8]) -> Result<PublicKey, Error> {
             SECItemBorrowed::wrap(&key).as_mut(),
         );
 
-        // let pk2 = EcdhPublicKey::from_ptr(pk_ptr)?;
-
         let pk = EcdhPublicKey::from_ptr(pk_ptr)?;
-        // println!("\n");
-
-        // for x in &pk.key_data()? {
-        //     print !("{:#04x}  ",x);
-        // }
-
-        let kp = EcdhKeypair {
-            public: pk,
-            private: sk,
-        };
-
-        Ok(kp.public)
+        Ok(pk)
     };
     ecdh_keypair
 }
