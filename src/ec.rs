@@ -5,9 +5,9 @@
 // except according to those terms.
 
 use crate::der;
+use crate::err::into_result;
 use crate::err::IntoResult;
 use crate::init;
-use crate::p11::PK11ObjectType;
 use crate::p11::PK11ObjectType::PK11_TypePrivKey;
 use crate::p11::PK11ObjectType::PK11_TypePubKey;
 use crate::p11::PK11_ExportDERPrivateKeyInfo;
@@ -15,32 +15,26 @@ use crate::p11::PK11_ImportDERPrivateKeyInfoAndReturnKey;
 use crate::p11::PK11_PubDeriveWithKDF;
 use crate::p11::PK11_ReadRawAttribute;
 use crate::p11::PK11_WriteRawAttribute;
+use crate::p11::SECKEY_DecodeDERSubjectPublicKeyInfo;
 use crate::Error;
 use pkcs11_bindings::CKA_EC_POINT;
 use pkcs11_bindings::CKA_VALUE;
 use pkcs11_bindings::CK_FALSE;
 
 use crate::util::SECItemMut;
+// use std::convert::TryInto;
 
-use std::convert::TryInto;
 use std::ptr;
-// use std::ptr::null;
-// use std::ptr::null_mut;
 
 use crate::p11::PK11_GenerateKeyPair;
-use crate::p11::PK11_GenerateKeyPairWithOpFlags;
 use crate::p11::Slot;
 use crate::p11::KU_ALL;
-use crate::p11::PK11_ATTR_EXTRACTABLE;
-use crate::p11::PK11_ATTR_INSENSITIVE;
-use crate::p11::PK11_ATTR_SESSION;
 
 use crate::PrivateKey;
 use crate::PublicKey;
 use crate::SECItem;
 use crate::SECItemBorrowed;
 
-use pkcs11_bindings::CKF_DERIVE;
 use pkcs11_bindings::CKM_EC_EDWARDS_KEY_PAIR_GEN;
 use pkcs11_bindings::CKM_EC_KEY_PAIR_GEN;
 use pkcs11_bindings::CKM_EC_MONTGOMERY_KEY_PAIR_GEN;
@@ -158,21 +152,6 @@ pub fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
 
     // https://github.com/mozilla/nss-gk-api/issues/1
     unsafe {
-        // let sk =
-        //     // Type of `param` argument depends on mechanism. For EC keygen it is
-        //     // `SECKEYECParams *` which is a typedef for `SECItem *`.
-        //     PK11_GenerateKeyPairWithOpFlags(
-        //         *slot,
-        //         ckm,
-        //         oid_ptr.cast(),
-        //         &mut pk_ptr,
-        //         PK11_ATTR_EXTRACTABLE | PK11_ATTR_INSENSITIVE | PK11_ATTR_SESSION,
-        //         CKF_DERIVE,
-        //         CKF_DERIVE,
-        //         ptr::null_mut(),
-        //     )
-        //     .into_result()?;
-
         let sk = PK11_GenerateKeyPair(
             *slot,
             ckm,
@@ -201,6 +180,23 @@ pub fn export_ec_private_key_pkcs8(key: PrivateKey) -> Result<Vec<u8>, Error> {
         let sk: crate::ScopedSECItem =
             PK11_ExportDERPrivateKeyInfo(*key, ptr::null_mut()).into_result()?;
         return Ok(sk.into_vec());
+    }
+}
+
+pub fn import_ec_public_key_from_spki(spki: &[u8]) -> Result<PublicKey, Error> {
+    init();
+    let mut spki_item = SECItemBorrowed::wrap(&spki);
+    let spki_item_ptr = spki_item.as_mut();
+
+    unsafe {
+        let spki = SECKEY_DecodeDERSubjectPublicKeyInfo(spki_item_ptr)
+            .into_result()
+            .unwrap();
+        let pk: PublicKey = crate::p11::SECKEY_ExtractPublicKey(spki.as_mut().unwrap())
+            .into_result()
+            .unwrap();
+
+        Ok(pk)
     }
 }
 
@@ -235,130 +231,17 @@ pub fn import_ec_private_key_pkcs8(pki: &[u8]) -> Result<PrivateKey, Error> {
     }
 }
 
-pub fn import_ec_public_key_from_raw(key: &[u8], curve: EcCurve) -> Result<PublicKey, Error> {
-    init();
-
-    // Get the OID for the Curve
-    let curve_oid = ec_curve_to_oid(&curve)?;
-    let oid_bytes = object_id(&curve_oid)?;
-    let mut oid = SECItemBorrowed::wrap(&oid_bytes);
-    let oid_ptr: *mut SECItem = oid.as_mut();
-
-    // Get the Mechanism based on the Curve and its use
-    let ckm = ec_curve_to_ckm(&curve);
-
-    // Get the PKCS11 slot
-    let slot = Slot::internal()?;
-
-    // Create a pointer for the public key
-    let mut pk_ptr: *mut crate::p11::SECKEYPublicKeyStr = ptr::null_mut();
-
-    // https://github.com/mozilla/nss-gk-api/issues/1
-    let ecdh_keypair = unsafe {
-        let _sk =
-            // Type of `param` argument depends on mechanism. For EC keygen it is
-            // `SECKEYECParams *` which is a typedef for `SECItem *`.
-            PK11_GenerateKeyPair(
-                *slot,
-                ckm,
-                oid_ptr.cast(),
-                &mut pk_ptr,
-                CK_FALSE.into(),
-                CK_FALSE.into(),
-                ptr::null_mut(),
-            )
-            .into_result()?;
-
-        PK11_WriteRawAttribute(
-            PK11_TypePubKey,
-            pk_ptr.to_owned().cast(),
-            CKA_EC_POINT,
-            SECItemBorrowed::wrap(&key).as_mut(),
-        );
-
-        let pk = EcdhPublicKey::from_ptr(pk_ptr)?;
-        Ok(pk)
-    };
-    ecdh_keypair
-}
-
-pub fn export_ec_public_key_from_raw(key: PublicKey) -> Result<Vec<u8>, Error> {
-    let mut key_item = SECItemMut::make_empty();
-    unsafe {
-        PK11_ReadRawAttribute(
-            PK11ObjectType::PK11_TypePrivKey,
-            key.cast(),
-            CKA_EC_POINT,
-            key_item.as_mut(),
-        )
-    };
-    Ok(key_item.as_slice().to_owned())
-}
-
-// This is not gonna work.
-// Attribute CKA_VALUE is private
-pub fn import_ec_private_key_from_raw(key: &[u8]) -> Result<PrivateKey, Error> {
-    init();
-    let curve = EcCurve::P256;
-
-    // Get the OID for the Curve
-    let curve_oid = ec_curve_to_oid(&curve)?;
-    let oid_bytes = object_id(&curve_oid)?;
-    let mut oid = SECItemBorrowed::wrap(&oid_bytes);
-    let oid_ptr: *mut SECItem = oid.as_mut();
-
-    // Get the Mechanism based on the Curve and its use
-    let ckm = ec_curve_to_ckm(&curve);
-
-    // Get the PKCS11 slot
-    let slot = Slot::internal()?;
-
-    // Create a pointer for the public key
-    let mut pk_ptr: *mut crate::p11::SECKEYPublicKeyStr = ptr::null_mut();
-
-    // https://github.com/mozilla/nss-gk-api/issues/1
-    unsafe {
-        let sk =
-            // Type of `param` argument depends on mechanism. For EC keygen it is
-            // `SECKEYECParams *` which is a typedef for `SECItem *`.
-            PK11_GenerateKeyPair(
-                *slot,
-                ckm,
-                oid_ptr.cast(),
-                &mut pk_ptr,
-                CK_FALSE.into(),
-                CK_FALSE.into(),
-                ptr::null_mut(),
-            )
-            .into_result()?;
-
-        PK11_WriteRawAttribute(
-            PK11_TypePrivKey,
-            sk.cast(),
-            CKA_VALUE,
-            SECItemBorrowed::wrap(&key).as_mut(),
-        );
-
-        Ok(sk)
-    }
-}
-
 pub fn export_ec_private_key_from_raw(key: PrivateKey) -> Result<Vec<u8>, Error> {
+    init();
     let mut key_item = SECItemMut::make_empty();
-    unsafe {
-        PK11_ReadRawAttribute(
-            PK11ObjectType::PK11_TypePrivKey,
-            key.cast(),
-            CKA_VALUE,
-            key_item.as_mut(),
-        )
-    };
+    unsafe { PK11_ReadRawAttribute(PK11_TypePrivKey, key.cast(), CKA_VALUE, key_item.as_mut()) };
     Ok(key_item.as_slice().to_owned())
 }
 
 pub fn ecdh(sk: PrivateKey, pk: PublicKey) -> Result<Vec<u8>, Error> {
-    unsafe {
-        let k = PK11_PubDeriveWithKDF(
+    init();
+    let sym_key = unsafe {
+        PK11_PubDeriveWithKDF(
             sk.cast(),
             pk.cast(),
             0,
@@ -372,18 +255,15 @@ pub fn ecdh(sk: PrivateKey, pk: PublicKey) -> Result<Vec<u8>, Error> {
             ptr::null_mut(),
             ptr::null_mut(),
         )
-        .into_result()
-        .unwrap();
+        .into_result()?
+    };
 
-        crate::p11::PK11_ExtractKeyValue(k.as_mut().unwrap());
-
-        let extracted = crate::p11::PK11_GetKeyData(k.as_mut().unwrap());
-        let r = extracted.into_result().unwrap().into_vec();
-        Ok(r)
-    }
+    let key = sym_key.key_data().unwrap(); 
+    Ok(key.to_vec())
 }
 
 pub fn convert_to_public(sk: PrivateKey) -> Result<PublicKey, Error> {
+    init();
     unsafe {
         let pk = crate::p11::SECKEY_ConvertToPublicKey(*sk).into_result()?;
         Ok(pk)
