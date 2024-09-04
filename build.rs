@@ -287,9 +287,6 @@ fn build_bindings(base: &str, bindings: &Bindings, flags: &[String], gecko: bool
 }
 
 fn setup_standalone() -> Vec<String> {
-
-    println!("Red pandas jumps");
-
     setup_clang();
 
     let nss = nss_dir();

@@ -5,8 +5,7 @@
 // except according to those terms.
 
 use crate::der;
-use crate::err::into_result;
-use crate::err::IntoResult;
+use crate::err::{secstatus_to_res, Error, IntoResult};
 use crate::init;
 use crate::p11::PK11ObjectType::PK11_TypePrivKey;
 use crate::p11::PK11ObjectType::PK11_TypePubKey;
@@ -14,9 +13,7 @@ use crate::p11::PK11_ExportDERPrivateKeyInfo;
 use crate::p11::PK11_ImportDERPrivateKeyInfoAndReturnKey;
 use crate::p11::PK11_PubDeriveWithKDF;
 use crate::p11::PK11_ReadRawAttribute;
-use crate::p11::PK11_WriteRawAttribute;
 use crate::p11::SECKEY_DecodeDERSubjectPublicKeyInfo;
-use crate::Error;
 use pkcs11_bindings::CKA_EC_POINT;
 use pkcs11_bindings::CKA_VALUE;
 use pkcs11_bindings::CK_FALSE;
@@ -177,8 +174,9 @@ pub fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
 pub fn export_ec_private_key_pkcs8(key: PrivateKey) -> Result<Vec<u8>, Error> {
     init();
     unsafe {
-        let sk: crate::ScopedSECItem =
-            PK11_ExportDERPrivateKeyInfo(*key, ptr::null_mut()).into_result()?;
+        let sk: crate::ScopedSECItem = PK11_ExportDERPrivateKeyInfo(*key, ptr::null_mut())
+            .into_result()
+            .unwrap();
         return Ok(sk.into_vec());
     }
 }
@@ -212,7 +210,7 @@ pub fn import_ec_private_key_pkcs8(pki: &[u8]) -> Result<PrivateKey, Error> {
     let mut pk_ptr = ptr::null_mut();
 
     unsafe {
-        let r = PK11_ImportDERPrivateKeyInfoAndReturnKey(
+        secstatus_to_res(PK11_ImportDERPrivateKeyInfoAndReturnKey(
             *slot,
             der_pki_ptr,
             ptr::null_mut(),
@@ -222,12 +220,11 @@ pub fn import_ec_private_key_pkcs8(pki: &[u8]) -> Result<PrivateKey, Error> {
             KU_ALL,
             &mut pk_ptr,
             ptr::null_mut(),
-        );
+        ))
+        .expect("PKCS8 encoded key import has failed");
+
         let sk = EcdhPrivateKey::from_ptr(pk_ptr)?;
-        match r {
-            0 => Ok(sk),
-            _ => Err(Error::InvalidInput),
-        }
+        Ok(sk)
     }
 }
 
@@ -270,37 +267,45 @@ pub fn convert_to_public(sk: PrivateKey) -> Result<PublicKey, Error> {
     }
 }
 
-pub fn sign(private_key: PrivateKey, data: &[u8], mechanism: std::os::raw::c_ulong) -> Result<Vec<u8>, Error> { 
+pub fn sign(
+    private_key: PrivateKey,
+    data: &[u8],
+    mechanism: std::os::raw::c_ulong,
+) -> Result<Vec<u8>, Error> {
     init();
+    let data_signature = vec![0u8; 0x40];
+
+    let mut data_to_sign = SECItemBorrowed::wrap(&data);
+    let mut signature = SECItemBorrowed::wrap(&data_signature);
     unsafe {
-        let data_signature = vec![0u8; 0x40];
-
-        let mut data_to_sign = SECItemBorrowed::wrap(&data);
-        let mut signature = SECItemBorrowed::wrap(&data_signature);
-
-        let rv = crate::p11::PK11_SignWithMechanism(
+        secstatus_to_res(crate::p11::PK11_SignWithMechanism(
             private_key.as_mut().unwrap(),
             mechanism,
             std::ptr::null_mut(),
             signature.as_mut(),
             data_to_sign.as_mut(),
-        );
+        ))
+        .expect("Signature has failed");
 
         let signature = signature.as_slice().to_vec();
         Ok(signature)
     }
 }
 
-
-pub fn sign_ecdsa(private_key: PrivateKey, data: &[u8]) -> Result<Vec<u8>, Error> { 
+pub fn sign_ecdsa(private_key: PrivateKey, data: &[u8]) -> Result<Vec<u8>, Error> {
     sign(private_key, data, crate::p11::CKM_ECDSA.into())
 }
 
-pub fn sign_eddsa(private_key: PrivateKey, data: &[u8]) -> Result<Vec<u8>, Error> { 
+pub fn sign_eddsa(private_key: PrivateKey, data: &[u8]) -> Result<Vec<u8>, Error> {
     sign(private_key, data, crate::p11::CKM_EDDSA.into())
 }
 
-pub fn verify(public_key: PublicKey, data: &[u8], signature: &[u8], mechanism: std::os::raw::c_ulong) -> Result<bool, Error> {
+pub fn verify(
+    public_key: PublicKey,
+    data: &[u8],
+    signature: &[u8],
+    mechanism: std::os::raw::c_ulong,
+) -> Result<bool, Error> {
     init();
     unsafe {
         let mut data_to_sign = SECItemBorrowed::wrap(&data);
@@ -321,7 +326,6 @@ pub fn verify(public_key: PublicKey, data: &[u8], signature: &[u8], mechanism: s
         }
     }
 }
-
 
 pub fn verify_ecdsa(public_key: PublicKey, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
     verify(public_key, data, signature, crate::p11::CKM_ECDSA.into())

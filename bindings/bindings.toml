@@ -146,7 +146,6 @@ variables = [
     "SECMOD_DB",
 ]
 
-
 [nss_p11]
 types = [
     "CK_BBOOL",
@@ -201,14 +200,12 @@ functions = [
     "PK11_ImportSymKey",
     "PK11_PubDeriveWithKDF",
     "PK11_ReadRawAttribute",
-    "PK11_WriteRawAttribute",
     "PK11_ReferenceSymKey",
     "PK11_SignWithMechanism",
     "PK11_VerifyWithMechanism",
     "PK11_WrapPrivKey",
     "SECKEY_CopyPrivateKey",
     "SECKEY_CopyPublicKey",
-    "SECKEY_CreateSubjectPublicKeyInfo",
     "SECKEY_DecodeDERSubjectPublicKeyInfo",
     "SECKEY_DestroyPrivateKey",
     "SECKEY_DestroyPublicKey",
@@ -331,19 +328,3 @@ functions = ["PR_Now"]
 cplusplus = true
 types = ["mozilla::pkix::ErrorCode"]
 enums = ["mozilla::pkix::ErrorCode"]
-
-
-
-[nss_asn1]
-types = [
-    "SEC_ASN1Template",
-]
-functions = [
-    "SEC_ASN1EncodeItem",
-    "SEC_ASN1EncodeInteger",
-    "SEC_ASN1DecodeInteger",
-    "SEC_ASN1EncodeItem",
-]
-variables = [
-    "CERT_SubjectPublicKeyInfoTemplate",
-]
