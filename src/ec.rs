@@ -7,35 +7,31 @@
 use crate::der;
 use crate::err::{secstatus_to_res, Error, IntoResult};
 use crate::init;
+
 use crate::p11::PK11ObjectType::PK11_TypePrivKey;
-use crate::p11::PK11ObjectType::PK11_TypePubKey;
 use crate::p11::PK11_ExportDERPrivateKeyInfo;
+use crate::p11::PK11_GenerateKeyPair;
 use crate::p11::PK11_ImportDERPrivateKeyInfoAndReturnKey;
 use crate::p11::PK11_PubDeriveWithKDF;
 use crate::p11::PK11_ReadRawAttribute;
 use crate::p11::SECKEY_DecodeDERSubjectPublicKeyInfo;
-use pkcs11_bindings::CKA_EC_POINT;
-use pkcs11_bindings::CKA_VALUE;
-use pkcs11_bindings::CK_FALSE;
-
-use crate::util::SECItemMut;
-// use std::convert::TryInto;
-
-use std::ptr;
-
-use crate::p11::PK11_GenerateKeyPair;
 use crate::p11::Slot;
 use crate::p11::KU_ALL;
+
+use crate::util::SECItemMut;
 
 use crate::PrivateKey;
 use crate::PublicKey;
 use crate::SECItem;
 use crate::SECItemBorrowed;
 
+use pkcs11_bindings::CKA_VALUE;
 use pkcs11_bindings::CKM_EC_EDWARDS_KEY_PAIR_GEN;
 use pkcs11_bindings::CKM_EC_KEY_PAIR_GEN;
 use pkcs11_bindings::CKM_EC_MONTGOMERY_KEY_PAIR_GEN;
+use pkcs11_bindings::CK_FALSE;
 
+use std::ptr;
 //
 // Constants
 //

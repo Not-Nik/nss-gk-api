@@ -12,8 +12,6 @@
 #![allow(clippy::unseparated_literal_suffix)]
 #![allow(clippy::used_underscore_binding)]
 
-#[allow(dead_code)]
-
 #[macro_use]
 pub mod err;
 #[macro_use]
