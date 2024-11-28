@@ -16,7 +16,7 @@ use pkcs11_bindings::{CKA_EC_POINT, CKA_VALUE};
 use PK11ObjectType::PK11_TypePubKey;
 
 use std::convert::TryFrom;
-use std::os::raw::{c_int};
+use std::os::raw::c_int;
 
 #[must_use]
 pub fn hex_with_len(buf: impl AsRef<[u8]>) -> String {
@@ -151,6 +151,10 @@ impl SymKey {
             None => Err(Error::InternalError),
             Some(key) => Ok(unsafe { std::slice::from_raw_parts(key.data, key.len as usize) }),
         }
+    }
+
+    pub fn as_bytes(&self) -> Res<&[u8]> {
+        self.key_data()
     }
 }
 
