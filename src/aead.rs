@@ -1,3 +1,9 @@
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
 use crate::p11::Context;
 use crate::p11::{
     self, PK11_AEADOp, PK11_CreateContextBySymKey, CKA_DECRYPT, CKA_ENCRYPT, CKA_NSS_MESSAGE,
@@ -14,8 +20,10 @@ use std::os::raw::c_int;
 
 /// All the nonces are the same length.  Exploit that.
 pub const NONCE_LEN: usize = 12;
+
 /// The portion of the nonce that is a counter.
 const COUNTER_LEN: usize = mem::size_of::<SequenceNumber>();
+
 /// The NSS API insists on us identifying the tag separately, which is awful.
 /// All of the AEAD functions here have a tag of this length, so use a fixed offset.
 const TAG_LEN: usize = 16;
@@ -99,12 +107,6 @@ impl Aead {
     ) -> Result<Self, crate::Error> {
         crate::init();
 
-        // trace!(
-        //     "New AEAD: key={} nonce_base={}",
-        //     hex::encode(key.key_data()?),
-        //     hex::encode(nonce_base)
-        // );
-
         let ptr = unsafe {
             PK11_CreateContextBySymKey(
                 Self::mech(algorithm),
@@ -183,8 +185,8 @@ impl Aead {
                 c_int_len(aad.len()),
                 pt.as_mut_ptr(),
                 &mut pt_len,
-                c_int_len(pt.len()),                    // signed :(
-                ct.as_ptr().add(pt_expected) as *mut _, // const cast :(
+                c_int_len(pt.len()),
+                ct.as_ptr().add(pt_expected) as *mut _,
                 c_int_len(TAG_LEN),
                 ct.as_ptr(),
                 c_int_len(pt_expected),
