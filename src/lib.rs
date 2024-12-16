@@ -25,7 +25,6 @@ pub mod ec;
 pub mod hash;
 pub mod hkdf;
 pub mod hmac;
-// pub mod hpke;
 pub mod p11;
 mod prio;
 mod ssl;
