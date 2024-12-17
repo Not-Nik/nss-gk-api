@@ -12,6 +12,7 @@
 use crate::err::{secstatus_to_res, Error, Res};
 use crate::util::SECItemMut;
 
+use pkcs11_bindings::CKA_EC_POINT;
 use pkcs11_bindings::CKA_VALUE;
 
 use std::convert::TryFrom;
@@ -77,6 +78,19 @@ impl PublicKey {
         })?;
         buf.truncate(usize::try_from(len).unwrap());
         Ok(buf)
+    }
+
+    pub fn key_data_alt(&self) -> Res<Vec<u8>> {
+        let mut key_item = SECItemMut::make_empty();
+        secstatus_to_res(unsafe {
+            PK11_ReadRawAttribute(
+                PK11ObjectType::PK11_TypePubKey,
+                (**self).cast(),
+                CKA_EC_POINT,
+                key_item.as_mut(),
+            )
+        })?;
+        Ok(key_item.as_slice().to_owned())
     }
 }
 
