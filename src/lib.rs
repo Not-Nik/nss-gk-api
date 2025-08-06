@@ -30,7 +30,7 @@ mod prio;
 mod ssl;
 pub mod time;
 
-pub use err::{secstatus_to_res, Error, IntoResult};
+pub use err::{secstatus_to_res, Error, IntoResult, Result};
 pub use p11::{PrivateKey, PublicKey, SymKey};
 pub use util::*;
 

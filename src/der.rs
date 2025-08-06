@@ -4,7 +4,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::Error;
+use crate::{Error, Result};
 
 pub const TAG_INTEGER: u8 = 0x02;
 pub const TAG_BIT_STRING: u8 = 0x03;
@@ -30,7 +30,7 @@ pub const OID_RS256_BYTES: &[u8] = &[
 
 pub const MAX_TAG_AND_LENGTH_BYTES: usize = 4;
 
-pub fn write_tag_and_length(out: &mut Vec<u8>, tag: u8, len: usize) -> Result<(), crate::Error> {
+pub fn write_tag_and_length(out: &mut Vec<u8>, tag: u8, len: usize) -> Result<()> {
     if len > 0xFFFF {
         return Err(crate::Error::InternalError);
     }
@@ -48,7 +48,7 @@ pub fn write_tag_and_length(out: &mut Vec<u8>, tag: u8, len: usize) -> Result<()
     Ok(())
 }
 
-pub fn integer(val: &[u8]) -> Result<Vec<u8>, crate::Error> {
+pub fn integer(val: &[u8]) -> Result<Vec<u8>> {
     if val.is_empty() {
         return Err(crate::Error::InvalidInput);
     }
@@ -70,7 +70,7 @@ pub fn integer(val: &[u8]) -> Result<Vec<u8>, crate::Error> {
     Ok(out)
 }
 
-pub fn bit_string(val: &[u8]) -> Result<Vec<u8>, crate::Error> {
+pub fn bit_string(val: &[u8]) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(MAX_TAG_AND_LENGTH_BYTES + 1 + val.len());
     write_tag_and_length(&mut out, TAG_BIT_STRING, 1 + val.len())?;
     out.push(0x00); // trailing bits aren't supported
@@ -78,20 +78,20 @@ pub fn bit_string(val: &[u8]) -> Result<Vec<u8>, crate::Error> {
     Ok(out)
 }
 
-pub fn null() -> Result<Vec<u8>, crate::Error> {
+pub fn null() -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(MAX_TAG_AND_LENGTH_BYTES);
     write_tag_and_length(&mut out, TAG_NULL, 0)?;
     Ok(out)
 }
 
-pub fn object_id(val: &[u8]) -> Result<Vec<u8>, crate::Error> {
+pub fn object_id(val: &[u8]) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(MAX_TAG_AND_LENGTH_BYTES + val.len());
     write_tag_and_length(&mut out, TAG_OBJECT_ID, val.len())?;
     out.extend_from_slice(val);
     Ok(out)
 }
 
-pub fn sequence(items: &[&[u8]]) -> Result<Vec<u8>, crate::Error> {
+pub fn sequence(items: &[&[u8]]) -> Result<Vec<u8>> {
     let len = items.iter().map(|i| i.len()).sum();
     let mut out = Vec::with_capacity(MAX_TAG_AND_LENGTH_BYTES + len);
     write_tag_and_length(&mut out, TAG_SEQUENCE, len)?;
@@ -101,14 +101,14 @@ pub fn sequence(items: &[&[u8]]) -> Result<Vec<u8>, crate::Error> {
     Ok(out)
 }
 
-pub fn octet_string(val: &[u8]) -> Result<Vec<u8>, crate::Error> {
+pub fn octet_string(val: &[u8]) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(MAX_TAG_AND_LENGTH_BYTES + val.len());
     write_tag_and_length(&mut out, TAG_OCTET_STRING, val.len())?;
     out.extend_from_slice(val);
     Ok(out)
 }
 
-pub fn context_specific_explicit_tag(tag: u8, content: &[u8]) -> Result<Vec<u8>, crate::Error> {
+pub fn context_specific_explicit_tag(tag: u8, content: &[u8]) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(MAX_TAG_AND_LENGTH_BYTES + content.len());
     write_tag_and_length(&mut out, 0xa0 + tag, content.len())?;
     out.extend_from_slice(content);
@@ -117,7 +117,7 @@ pub fn context_specific_explicit_tag(tag: u8, content: &[u8]) -> Result<Vec<u8>,
 
 // Given "tag || len || value || rest" where tag and len are of length one, len is in [0, 127],
 // and value is of length len, returns (value, rest)
-pub fn expect_tag_with_short_len(tag: u8, z: &[u8]) -> Result<(&[u8], &[u8]), crate::Error> {
+pub fn expect_tag_with_short_len(tag: u8, z: &[u8]) -> Result<(&[u8], &[u8])> {
     if z.is_empty() {
         return Err(Error::InvalidInput);
     }

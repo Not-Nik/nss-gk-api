@@ -9,7 +9,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use crate::err::{secstatus_to_res, Error, Res};
+use crate::err::{secstatus_to_res, Error, Result};
 use crate::util::SECItemMut;
 
 use pkcs11_bindings::CKA_EC_POINT;
@@ -65,7 +65,7 @@ impl PublicKey {
     /// When the key cannot be exported, which can be because the type is not supported.
     /// # Panics
     /// When keys are too large to fit in `c_uint/usize`.  So only on programming error.
-    pub fn key_data(&self) -> Res<Vec<u8>> {
+    pub fn key_data(&self) -> Result<Vec<u8>> {
         let mut buf = vec![0; 100];
         let mut len: c_uint = 0;
         secstatus_to_res(unsafe {
@@ -80,7 +80,7 @@ impl PublicKey {
         Ok(buf)
     }
 
-    pub fn key_data_alt(&self) -> Res<Vec<u8>> {
+    pub fn key_data_alt(&self) -> Result<Vec<u8>> {
         let mut key_item = SECItemMut::make_empty();
         secstatus_to_res(unsafe {
             PK11_ReadRawAttribute(
@@ -115,7 +115,7 @@ impl PrivateKey {
     /// or because the key data cannot be extracted from the PKCS#11 module.
     /// # Panics
     /// When the values are too large to fit.  So never.
-    pub fn key_data(&self) -> Res<Vec<u8>> {
+    pub fn key_data(&self) -> Result<Vec<u8>> {
         let mut key_item = SECItemMut::make_empty();
         secstatus_to_res(unsafe {
             PK11_ReadRawAttribute(
@@ -142,7 +142,7 @@ impl std::fmt::Debug for PrivateKey {
 scoped_ptr!(Slot, PK11SlotInfo, PK11_FreeSlot);
 
 impl Slot {
-    pub fn internal() -> Res<Self> {
+    pub fn internal() -> Result<Self> {
         unsafe { Slot::from_ptr(PK11_GetInternalSlot()) }
     }
 }
@@ -156,7 +156,7 @@ impl SymKey {
     ///
     /// # Errors
     /// Internal errors in case of failures in NSS.
-    pub fn key_data(&self) -> Res<&[u8]> {
+    pub fn key_data(&self) -> Result<&[u8]> {
         secstatus_to_res(unsafe { PK11_ExtractKeyValue(**self) })?;
 
         let key_item = unsafe { PK11_GetKeyData(**self) };
@@ -167,7 +167,7 @@ impl SymKey {
         }
     }
 
-    pub fn as_bytes(&self) -> Res<&[u8]> {
+    pub fn as_bytes(&self) -> Result<&[u8]> {
         self.key_data()
     }
 }

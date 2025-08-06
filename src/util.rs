@@ -10,6 +10,7 @@ use std::mem;
 use std::os::raw::c_uint;
 use std::ptr::null_mut;
 
+use crate::err::Result;
 use crate::nss_prelude::*;
 use crate::prtypes::*;
 
@@ -30,7 +31,7 @@ macro_rules! scoped_ptr {
             ///
             /// # Errors
             /// When passed a null pointer generates an error.
-            pub unsafe fn from_ptr(raw: *mut $target) -> Result<Self, $crate::err::Error> {
+            pub unsafe fn from_ptr(raw: *mut $target) -> Result<Self> {
                 let ptr = $crate::err::into_result(raw)?;
                 Ok(Self { ptr })
             }
@@ -39,7 +40,7 @@ macro_rules! scoped_ptr {
         impl $crate::err::IntoResult for *mut $target {
             type Ok = $name;
 
-            unsafe fn into_result(self) -> Result<Self::Ok, $crate::err::Error> {
+            unsafe fn into_result(self) -> Result<Self::Ok> {
                 $name::from_ptr(self)
             }
         }

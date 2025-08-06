@@ -12,7 +12,7 @@ use crate::p11::{
 };
 use crate::secstatus_to_res;
 use crate::SECItemBorrowed;
-use crate::{Error, SymKey};
+use crate::{Error, Result, SymKey};
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::mem;
@@ -80,7 +80,7 @@ impl Aead {
         })
     }
 
-    pub fn import_key(algorithm: AeadAlgorithms, key: &[u8]) -> Result<SymKey, Error> {
+    pub fn import_key(algorithm: AeadAlgorithms, key: &[u8]) -> Result<SymKey> {
         let slot = p11::Slot::internal().map_err(|_| crate::Error::InternalError)?;
 
         let key_item = SECItemBorrowed::wrap(key);
@@ -104,7 +104,7 @@ impl Aead {
         algorithm: AeadAlgorithms,
         key: &SymKey,
         nonce_base: [u8; NONCE_LEN],
-    ) -> Result<Self, crate::Error> {
+    ) -> Result<Self> {
         crate::init();
 
         let ptr = unsafe {
@@ -122,7 +122,7 @@ impl Aead {
         })
     }
 
-    pub fn seal(&mut self, aad: &[u8], pt: &[u8]) -> Result<Vec<u8>, crate::Error> {
+    pub fn seal(&mut self, aad: &[u8], pt: &[u8]) -> Result<Vec<u8>> {
         crate::init();
 
         assert_eq!(self.mode, Mode::Encrypt);
@@ -158,12 +158,7 @@ impl Aead {
         Ok(ct)
     }
 
-    pub fn open(
-        &mut self,
-        aad: &[u8],
-        seq: SequenceNumber,
-        ct: &[u8],
-    ) -> Result<Vec<u8>, crate::Error> {
+    pub fn open(&mut self, aad: &[u8], seq: SequenceNumber, ct: &[u8]) -> Result<Vec<u8>> {
         crate::init();
 
         assert_eq!(self.mode, Mode::Decrypt);

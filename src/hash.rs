@@ -9,7 +9,7 @@ use crate::init;
 use crate::p11;
 use crate::p11::PK11_HashBuf;
 use crate::p11::SECOidTag;
-use crate::Error;
+use crate::{Error, Result};
 use std::convert::TryFrom;
 
 //
@@ -22,7 +22,7 @@ pub enum HashAlgorithm {
     SHA2_512,
 }
 
-fn hash_alg_to_oid(alg: &HashAlgorithm) -> Result<SECOidTag::Type, Error> {
+fn hash_alg_to_oid(alg: &HashAlgorithm) -> Result<SECOidTag::Type> {
     match alg {
         HashAlgorithm::SHA2_256 => Ok(SECOidTag::SEC_OID_SHA256),
         HashAlgorithm::SHA2_384 => Ok(SECOidTag::SEC_OID_SHA384),
@@ -30,7 +30,7 @@ fn hash_alg_to_oid(alg: &HashAlgorithm) -> Result<SECOidTag::Type, Error> {
     }
 }
 
-pub fn hash_alg_to_hash_len(alg: &HashAlgorithm) -> Result<usize, Error> {
+pub fn hash_alg_to_hash_len(alg: &HashAlgorithm) -> Result<usize> {
     match alg {
         HashAlgorithm::SHA2_256 => Ok(p11::SHA256_LENGTH as usize),
         HashAlgorithm::SHA2_384 => Ok(p11::SHA384_LENGTH as usize),
@@ -42,7 +42,7 @@ pub fn hash_alg_to_hash_len(alg: &HashAlgorithm) -> Result<usize, Error> {
 // Hash function
 //
 
-pub fn hash(alg: HashAlgorithm, data: &[u8]) -> Result<Vec<u8>, crate::Error> {
+pub fn hash(alg: HashAlgorithm, data: &[u8]) -> Result<Vec<u8>> {
     init();
 
     let data_len: i32 = match i32::try_from(data.len()) {

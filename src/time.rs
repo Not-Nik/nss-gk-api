@@ -6,8 +6,8 @@
 
 #![allow(clippy::upper_case_acronyms)]
 
+use crate::err::{Error, Result};
 use crate::nss_prelude::PRInt64;
-use crate::err::{Error, Res};
 //use crate::prio::PRFileDesc;
 //use crate::ssl::SSLTimeFunc;
 
@@ -103,7 +103,7 @@ impl From<Instant> for Time {
 
 impl TryFrom<PRTime> for Time {
     type Error = Error;
-    fn try_from(prtime: PRTime) -> Res<Self> {
+    fn try_from(prtime: PRTime) -> Result<Self> {
         let base = get_base();
         if let Some(delta) = prtime.checked_sub(base.prtime) {
             let d = Duration::from_micros(delta.try_into()?);
@@ -118,7 +118,7 @@ impl TryFrom<PRTime> for Time {
 
 impl TryInto<PRTime> for Time {
     type Error = Error;
-    fn try_into(self) -> Res<PRTime> {
+    fn try_into(self) -> Result<PRTime> {
         let base = get_base();
         let delta = self
             .t
@@ -153,7 +153,7 @@ impl Deref for Interval {
 
 impl TryFrom<PRTime> for Interval {
     type Error = Error;
-    fn try_from(prtime: PRTime) -> Res<Self> {
+    fn try_from(prtime: PRTime) -> Result<Self> {
         Ok(Self {
             d: Duration::from_micros(u64::try_from(prtime)?),
         })
@@ -168,7 +168,7 @@ impl From<Duration> for Interval {
 
 impl TryInto<PRTime> for Interval {
     type Error = Error;
-    fn try_into(self) -> Res<PRTime> {
+    fn try_into(self) -> Result<PRTime> {
         Ok(PRTime::try_from(self.d.as_micros())?)
     }
 }
@@ -186,11 +186,11 @@ impl TimeHolder {
         *p.as_ref().unwrap()
     }
 
-    pub fn bind(&mut self, fd: *mut PRFileDesc) -> Res<()> {
+    pub fn bind(&mut self, fd: *mut PRFileDesc) -> Result<()> {
         unsafe { SSL_SetTimeFunc(fd, Some(Self::time_func), &mut *self.t as *mut _ as *mut c_void) }
     }
 
-    pub fn set(&mut self, t: Instant) -> Res<()> {
+    pub fn set(&mut self, t: Instant) -> Result<()> {
         *self.t = Time::from(t).try_into()?;
         Ok(())
     }
@@ -248,7 +248,7 @@ mod test {
     fn overflow_interval() {
         init();
         let interval = Interval::from(Duration::from_micros(u64::max_value()));
-        let res: Res<PRTime> = interval.try_into();
+        let res: Result<PRTime> = interval.try_into();
         assert!(res.is_err());
     }
 }

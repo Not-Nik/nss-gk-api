@@ -73,7 +73,7 @@ impl Default for Config {
 }
 
 pub trait Exporter {
-    fn export(&self, info: &[u8], len: usize) -> Res<SymKey>;
+    fn export(&self, info: &[u8], len: usize) -> Result<SymKey>;
 }
 
 unsafe fn destroy_hpke_context(cx: *mut HpkeContext) {
@@ -126,7 +126,7 @@ pub struct HpkeS {
 impl HpkeS {
     /// Create a new context that uses the KEM mode for sending.
     #[allow(clippy::similar_names)]
-    pub fn new(config: Config, pk_r: &mut PublicKey, info: &[u8]) -> Res<Self> {
+    pub fn new(config: Config, pk_r: &mut PublicKey, info: &[u8]) -> Result<Self> {
         let (sk_e, pk_e) = generate_key_pair(config.kem)?;
         let context = HpkeContext::new(config)?;
         secstatus_to_res(unsafe {
@@ -140,7 +140,7 @@ impl HpkeS {
     }
 
     /// Get the encapsulated KEM secret.
-    pub fn enc(&self) -> Res<Vec<u8>> {
+    pub fn enc(&self) -> Result<Vec<u8>> {
         let v = unsafe { p11::PK11_HPKE_GetEncapPubKey(*self.context) };
         let r = unsafe { v.as_ref() }.ok_or_else(|| Error::from(SEC_ERROR_INVALID_ARGS))?;
         // This is just an alias, so we can't use `Item`.
@@ -149,7 +149,7 @@ impl HpkeS {
         Ok(Vec::from(slc))
     }
 
-    pub fn seal(&mut self, aad: &[u8], pt: &[u8]) -> Res<Vec<u8>> {
+    pub fn seal(&mut self, aad: &[u8], pt: &[u8]) -> Result<Vec<u8>> {
         let mut out: *mut SECItem = null_mut();
         secstatus_to_res(unsafe {
             p11::PK11_HPKE_Seal(*self.context, &Item::wrap(aad), &Item::wrap(pt), &mut out)
@@ -160,7 +160,7 @@ impl HpkeS {
 }
 
 impl Exporter for HpkeS {
-    fn export(&self, info: &[u8], len: usize) -> Res<SymKey> {
+    fn export(&self, info: &[u8], len: usize) -> Result<SymKey> {
         self.context.export(info, len)
     }
 }
@@ -187,7 +187,7 @@ impl HpkeR {
         sk_r: &mut PrivateKey,
         enc: &[u8],
         info: &[u8],
-    ) -> Res<Self> {
+    ) -> Result<Self> {
         let context = HpkeContext::new(config)?;
         secstatus_to_res(unsafe {
             p11::PK11_HPKE_SetupR(
@@ -205,7 +205,7 @@ impl HpkeR {
         self.config
     }
 
-    pub fn decode_public_key(kem: KemAlgorithm, k: &[u8]) -> Res<PublicKey> {
+    pub fn decode_public_key(kem: KemAlgorithm, k: &[u8]) -> Result<PublicKey> {
         // NSS uses a context for this, but we don't want that, but a dummy one works fine.
         let context = HpkeContext::new(Config {
             kem,
@@ -223,7 +223,7 @@ impl HpkeR {
         unsafe { PublicKey::from_ptr(ptr) }
     }
 
-    pub fn open(&mut self, aad: &[u8], ct: &[u8]) -> Res<Vec<u8>> {
+    pub fn open(&mut self, aad: &[u8], ct: &[u8]) -> Result<Vec<u8>> {
         let mut out: *mut SECItem = null_mut();
         secstatus_to_res(unsafe {
             p11::PK11_HPKE_Open(*self.context, &Item::wrap(aad), &Item::wrap(ct), &mut out)

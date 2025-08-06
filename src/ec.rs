@@ -4,17 +4,17 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::{der, PR_FALSE};
-use crate::err::{secstatus_to_res, Error, IntoResult};
+use crate::err::{secstatus_to_res, Error, IntoResult, Result};
 use crate::init;
+use crate::{der, PR_FALSE};
 
 use crate::p11::PK11ObjectType::PK11_TypePrivKey;
 use crate::p11::PK11_ExportDERPrivateKeyInfo;
 use crate::p11::PK11_GenerateKeyPair;
 use crate::p11::PK11_ImportDERPrivateKeyInfoAndReturnKey;
+use crate::p11::PK11_ImportPublicKey;
 use crate::p11::PK11_PubDeriveWithKDF;
 use crate::p11::PK11_ReadRawAttribute;
-use crate::p11::PK11_ImportPublicKey;
 use crate::p11::SECKEY_DecodeDERSubjectPublicKeyInfo;
 use crate::p11::Slot;
 use crate::p11::KU_ALL;
@@ -62,7 +62,7 @@ impl Ecdh {
         Self(curve)
     }
 
-    pub fn generate_keypair(&self, curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
+    pub fn generate_keypair(&self, curve: EcCurve) -> Result<EcdhKeypair> {
         return ecdh_keygen(curve);
     }
 }
@@ -97,14 +97,14 @@ pub const OID_X25519_BYTES: &[u8] = &[
     0x2b, 0x06, 0x01, 0x04, 0x01, 0xDA, 0x47, 0x0F, 0x01,
 ];
 
-pub fn object_id(val: &[u8]) -> Result<Vec<u8>, Error> {
+pub fn object_id(val: &[u8]) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(der::MAX_TAG_AND_LENGTH_BYTES + val.len());
     der::write_tag_and_length(&mut out, der::TAG_OBJECT_ID, val.len())?;
     out.extend_from_slice(val);
     Ok(out)
 }
 
-fn ec_curve_to_oid(alg: &EcCurve) -> Result<Vec<u8>, Error> {
+fn ec_curve_to_oid(alg: &EcCurve) -> Result<Vec<u8>> {
     match alg {
         EcCurve::X25519 => Ok(OID_X25519_BYTES.to_vec()),
         EcCurve::Ed25519 => Ok(OID_ED25519_BYTES.to_vec()),
@@ -126,7 +126,7 @@ fn ec_curve_to_ckm(alg: &EcCurve) -> pkcs11_bindings::CK_MECHANISM_TYPE {
 // Curve functions
 //
 
-pub fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
+pub fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair> {
     init();
 
     // Get the OID for the Curve
@@ -168,7 +168,7 @@ pub fn ecdh_keygen(curve: EcCurve) -> Result<EcdhKeypair, crate::Error> {
     }
 }
 
-pub fn export_ec_private_key_pkcs8(key: PrivateKey) -> Result<Vec<u8>, Error> {
+pub fn export_ec_private_key_pkcs8(key: PrivateKey) -> Result<Vec<u8>> {
     init();
     unsafe {
         let sk: crate::ScopedSECItem = PK11_ExportDERPrivateKeyInfo(*key, ptr::null_mut())
@@ -178,7 +178,7 @@ pub fn export_ec_private_key_pkcs8(key: PrivateKey) -> Result<Vec<u8>, Error> {
     }
 }
 
-pub fn import_ec_public_key_from_spki(spki: &[u8]) -> Result<PublicKey, Error> {
+pub fn import_ec_public_key_from_spki(spki: &[u8]) -> Result<PublicKey> {
     init();
     let mut spki_item = SECItemBorrowed::wrap(&spki);
     let spki_item_ptr = spki_item.as_mut();
@@ -192,16 +192,15 @@ pub fn import_ec_public_key_from_spki(spki: &[u8]) -> Result<PublicKey, Error> {
             .unwrap();
 
         let handle = PK11_ImportPublicKey(*slot, *pk, PR_FALSE);
-        if handle == pkcs11_bindings::CK_INVALID_HANDLE
-        {
-            return Err(Error::InvalidInput)
+        if handle == pkcs11_bindings::CK_INVALID_HANDLE {
+            return Err(Error::InvalidInput);
         }
 
         Ok(pk)
     }
 }
 
-pub fn import_ec_private_key_pkcs8(pki: &[u8]) -> Result<PrivateKey, Error> {
+pub fn import_ec_private_key_pkcs8(pki: &[u8]) -> Result<PrivateKey> {
     init();
 
     // Get the PKCS11 slot
@@ -231,14 +230,14 @@ pub fn import_ec_private_key_pkcs8(pki: &[u8]) -> Result<PrivateKey, Error> {
     }
 }
 
-pub fn export_ec_private_key_from_raw(key: PrivateKey) -> Result<Vec<u8>, Error> {
+pub fn export_ec_private_key_from_raw(key: PrivateKey) -> Result<Vec<u8>> {
     init();
     let mut key_item = SECItemMut::make_empty();
     unsafe { PK11_ReadRawAttribute(PK11_TypePrivKey, key.cast(), CKA_VALUE, key_item.as_mut()) };
     Ok(key_item.as_slice().to_owned())
 }
 
-pub fn ecdh(sk: PrivateKey, pk: PublicKey) -> Result<Vec<u8>, Error> {
+pub fn ecdh(sk: PrivateKey, pk: PublicKey) -> Result<Vec<u8>> {
     init();
     let sym_key = unsafe {
         PK11_PubDeriveWithKDF(
@@ -262,7 +261,7 @@ pub fn ecdh(sk: PrivateKey, pk: PublicKey) -> Result<Vec<u8>, Error> {
     Ok(key.to_vec())
 }
 
-pub fn convert_to_public(sk: PrivateKey) -> Result<PublicKey, Error> {
+pub fn convert_to_public(sk: PrivateKey) -> Result<PublicKey> {
     init();
     unsafe {
         let pk = crate::p11::SECKEY_ConvertToPublicKey(*sk).into_result()?;
@@ -274,7 +273,7 @@ pub fn sign(
     private_key: PrivateKey,
     data: &[u8],
     mechanism: std::os::raw::c_ulong,
-) -> Result<Vec<u8>, Error> {
+) -> Result<Vec<u8>> {
     init();
     let data_signature = vec![0u8; 0x40];
 
@@ -295,11 +294,11 @@ pub fn sign(
     }
 }
 
-pub fn sign_ecdsa(private_key: PrivateKey, data: &[u8]) -> Result<Vec<u8>, Error> {
+pub fn sign_ecdsa(private_key: PrivateKey, data: &[u8]) -> Result<Vec<u8>> {
     sign(private_key, data, crate::p11::CKM_ECDSA.into())
 }
 
-pub fn sign_eddsa(private_key: PrivateKey, data: &[u8]) -> Result<Vec<u8>, Error> {
+pub fn sign_eddsa(private_key: PrivateKey, data: &[u8]) -> Result<Vec<u8>> {
     sign(private_key, data, crate::p11::CKM_EDDSA.into())
 }
 
@@ -308,7 +307,7 @@ pub fn verify(
     data: &[u8],
     signature: &[u8],
     mechanism: std::os::raw::c_ulong,
-) -> Result<bool, Error> {
+) -> Result<bool> {
     init();
     unsafe {
         let mut data_to_sign = SECItemBorrowed::wrap(&data);
@@ -330,10 +329,10 @@ pub fn verify(
     }
 }
 
-pub fn verify_ecdsa(public_key: PublicKey, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
+pub fn verify_ecdsa(public_key: PublicKey, data: &[u8], signature: &[u8]) -> Result<bool> {
     verify(public_key, data, signature, crate::p11::CKM_ECDSA.into())
 }
 
-pub fn verify_eddsa(public_key: PublicKey, data: &[u8], signature: &[u8]) -> Result<bool, Error> {
+pub fn verify_eddsa(public_key: PublicKey, data: &[u8], signature: &[u8]) -> Result<bool> {
     verify(public_key, data, signature, crate::p11::CKM_EDDSA.into())
 }

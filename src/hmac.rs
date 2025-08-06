@@ -16,8 +16,8 @@ use crate::p11::PK11_DigestFinal;
 use crate::p11::PK11_DigestOp;
 use crate::p11::PK11_ImportSymKey;
 use crate::p11::Slot;
-use crate::Error;
 use crate::SECItemBorrowed;
+use crate::{Error, Result};
 use pkcs11_bindings::CKA_SIGN;
 use std::convert::TryFrom;
 use std::ptr;
@@ -40,7 +40,7 @@ fn hmac_alg_to_ckm(alg: &HmacAlgorithm) -> p11::CK_MECHANISM_TYPE {
     }
 }
 
-pub fn hmac_alg_to_hash_alg(alg: &HmacAlgorithm) -> Result<HashAlgorithm, Error> {
+pub fn hmac_alg_to_hash_alg(alg: &HmacAlgorithm) -> Result<HashAlgorithm> {
     match alg {
         HmacAlgorithm::HMAC_SHA2_256 => Ok(HashAlgorithm::SHA2_256),
         HmacAlgorithm::HMAC_SHA2_384 => Ok(HashAlgorithm::SHA2_384),
@@ -48,12 +48,12 @@ pub fn hmac_alg_to_hash_alg(alg: &HmacAlgorithm) -> Result<HashAlgorithm, Error>
     }
 }
 
-pub fn hmac_alg_to_hmac_len(alg: &HmacAlgorithm) -> Result<usize, Error> {
+pub fn hmac_alg_to_hmac_len(alg: &HmacAlgorithm) -> Result<usize> {
     let hash_alg = hmac_alg_to_hash_alg(&alg)?;
     hash::hash_alg_to_hash_len(&hash_alg)
 }
 
-pub fn hmac(alg: &HmacAlgorithm, key: &[u8], data: &[u8]) -> Result<Vec<u8>, Error> {
+pub fn hmac(alg: &HmacAlgorithm, key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
     crate::init();
 
     let data_len = match u32::try_from(data.len()) {

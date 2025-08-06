@@ -16,7 +16,7 @@
     clippy::borrow_as_ptr
 )]
 
-use crate::err::{secstatus_to_res, Res};
+use crate::err::{secstatus_to_res, Result};
 use crate::nss_prelude::*;
 use crate::prio::PRFileDesc;
 
@@ -78,7 +78,7 @@ impl Opt {
         PRIntn::from(v)
     }
 
-    pub(crate) fn set(self, fd: *mut PRFileDesc, value: bool) -> Res<()> {
+    pub(crate) fn set(self, fd: *mut PRFileDesc, value: bool) -> Result<()> {
         secstatus_to_res(unsafe { SSL_OptionSet(fd, self.as_int(), self.map_enabled(value)) })
     }
 }
