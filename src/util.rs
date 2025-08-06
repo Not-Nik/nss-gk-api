@@ -46,7 +46,6 @@ macro_rules! scoped_ptr {
 
         impl std::ops::Deref for $name {
             type Target = *mut $target;
-            #[must_use]
             fn deref(&self) -> &*mut $target {
                 &self.ptr
             }
@@ -65,7 +64,6 @@ macro_rules! scoped_ptr {
 macro_rules! impl_clone {
     ($name:ty, $nss_fn:path) => {
         impl Clone for $name {
-            #[must_use]
             fn clone(&self) -> Self {
                 let ptr = unsafe { $nss_fn(self.ptr) };
                 assert!(!ptr.is_null());
