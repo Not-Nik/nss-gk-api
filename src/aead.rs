@@ -30,15 +30,6 @@ const TAG_LEN: usize = 16;
 
 pub type SequenceNumber = u64;
 
-/// All the lengths used by `PK11_AEADOp` are signed.  This converts to that.
-fn c_int_len<T>(l: T) -> c_int
-where
-    T: TryInto<c_int>,
-    T::Error: std::error::Error,
-{
-    l.try_into().unwrap()
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Encrypt,
@@ -121,18 +112,18 @@ impl Aead {
             PK11_AEADOp(
                 *self.ctx,
                 CK_GENERATOR_FUNCTION::from(CKG_GENERATE_COUNTER_XOR),
-                c_int_len(NONCE_LEN - COUNTER_LEN), // Fixed portion of the nonce.
+                (NONCE_LEN - COUNTER_LEN).try_into()?, // Fixed portion of the nonce.
                 nonce.as_mut_ptr(),
-                c_int_len(nonce.len()),
+                nonce.len().try_into()?,
                 aad.as_ptr(),
-                c_int_len(aad.len()),
+                aad.len().try_into()?,
                 ct.as_mut_ptr(),
                 &mut ct_len,
-                c_int_len(ct.len()), // signed :(
+                ct.len().try_into()?,
                 tag.as_mut_ptr(),
-                c_int_len(tag.len()),
+                tag.len().try_into()?,
                 pt.as_ptr(),
-                c_int_len(pt.len()),
+                pt.len().try_into()?,
             )
         })?;
         ct.truncate(usize::try_from(ct_len).unwrap());
@@ -156,18 +147,18 @@ impl Aead {
             PK11_AEADOp(
                 *self.ctx,
                 CK_GENERATOR_FUNCTION::from(CKG_NO_GENERATE),
-                c_int_len(NONCE_LEN - COUNTER_LEN), // Fixed portion of the nonce.
+                (NONCE_LEN - COUNTER_LEN).try_into()?, // Fixed portion of the nonce.
                 nonce.as_mut_ptr(),
-                c_int_len(nonce.len()),
+                nonce.len().try_into()?,
                 aad.as_ptr(),
-                c_int_len(aad.len()),
+                aad.len().try_into()?,
                 pt.as_mut_ptr(),
                 &mut pt_len,
-                c_int_len(pt.len()),
+                pt.len().try_into()?,
                 ct.as_ptr().add(pt_expected) as *mut _,
-                c_int_len(TAG_LEN),
+                TAG_LEN.try_into()?,
                 ct.as_ptr(),
-                c_int_len(pt_expected),
+                pt_expected.try_into()?,
             )
         })?;
         let len = usize::try_from(pt_len).unwrap();

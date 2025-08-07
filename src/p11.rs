@@ -97,12 +97,7 @@ impl PublicKey {
         Ok(key_item.as_slice().to_owned())
     }
 
-    pub fn verify(
-        &self,
-        data: &[u8],
-        signature: &[u8],
-        mechanism: std::os::raw::c_ulong,
-    ) -> Result<bool> {
+    pub fn verify(&self, data: &[u8], signature: &[u8], mechanism: u32) -> Result<bool> {
         init();
         unsafe {
             let mut data_to_sign = SECItemBorrowed::wrap(&data);
@@ -125,11 +120,11 @@ impl PublicKey {
     }
 
     pub fn verify_ecdsa(&self, data: &[u8], signature: &[u8]) -> Result<bool> {
-        self.verify(data, signature, crate::p11::CKM_ECDSA.into())
+        self.verify(data, signature, crate::p11::CKM_ECDSA)
     }
 
     pub fn verify_eddsa(&self, data: &[u8], signature: &[u8]) -> Result<bool> {
-        self.verify(data, signature, crate::p11::CKM_EDDSA.into())
+        self.verify(data, signature, crate::p11::CKM_EDDSA)
     }
 }
 
@@ -200,7 +195,7 @@ impl PrivateKey {
         Ok(key_item.as_slice().to_owned())
     }
 
-    pub fn sign(&self, data: &[u8], mechanism: std::os::raw::c_ulong) -> Result<Vec<u8>> {
+    pub fn sign(&self, data: &[u8], mechanism: u32) -> Result<Vec<u8>> {
         init();
         let data_signature = vec![0u8; 0x40];
 
@@ -209,7 +204,7 @@ impl PrivateKey {
         unsafe {
             secstatus_to_res(crate::p11::PK11_SignWithMechanism(
                 self.as_mut().unwrap(),
-                mechanism,
+                mechanism.into(),
                 std::ptr::null_mut(),
                 signature.as_mut(),
                 data_to_sign.as_mut(),
@@ -222,11 +217,11 @@ impl PrivateKey {
     }
 
     pub fn sign_ecdsa(&self, data: &[u8]) -> Result<Vec<u8>> {
-        self.sign(data, crate::p11::CKM_ECDSA.into())
+        self.sign(data, crate::p11::CKM_ECDSA)
     }
 
     pub fn sign_eddsa(&self, data: &[u8]) -> Result<Vec<u8>> {
-        self.sign(data, crate::p11::CKM_EDDSA.into())
+        self.sign(data, crate::p11::CKM_EDDSA)
     }
 }
 
