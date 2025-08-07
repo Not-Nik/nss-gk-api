@@ -34,22 +34,21 @@ use std::os::raw::c_int;
 use std::os::raw::c_uint;
 use std::ptr::null_mut;
 
-#[derive(Clone, Copy, Debug)]
-
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HkdfError {
     InvalidPrkLength,
     InvalidLength,
     InternalError,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HkdfAlgorithm {
     HKDF_SHA2_256,
     HKDF_SHA2_384,
     HKDF_SHA2_512,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyMechanism {
     Hkdf,
 }
@@ -67,8 +66,8 @@ impl KeyMechanism {
         }
     }
 }
-#[derive(Clone, Copy, Debug)]
 
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct ParamItem<'a, T: 'a> {
     item: SECItem,
     marker: PhantomData<&'a T>,

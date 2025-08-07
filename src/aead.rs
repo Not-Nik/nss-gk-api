@@ -6,7 +6,7 @@
 
 use crate::p11::Context;
 use crate::p11::{
-    self, PK11_AEADOp, PK11_CreateContextBySymKey, CKA_DECRYPT, CKA_ENCRYPT, CKA_NSS_MESSAGE,
+    PK11_AEADOp, PK11_CreateContextBySymKey, CKA_DECRYPT, CKA_ENCRYPT, CKA_NSS_MESSAGE,
     CKG_GENERATE_COUNTER_XOR, CKG_NO_GENERATE, CKM_AES_GCM, CKM_CHACHA20_POLY1305,
     CK_ATTRIBUTE_TYPE, CK_GENERATOR_FUNCTION, CK_MECHANISM_TYPE,
 };
@@ -64,6 +64,17 @@ pub enum AeadAlgorithms {
     ChaCha20Poly1305,
 }
 
+impl Into<CK_MECHANISM_TYPE> for AeadAlgorithms {
+    fn into(self) -> CK_MECHANISM_TYPE {
+        CK_MECHANISM_TYPE::from(match self {
+            crate::aead::AeadAlgorithms::Aes128Gcm | crate::aead::AeadAlgorithms::Aes256Gcm => {
+                CKM_AES_GCM
+            }
+            crate::aead::AeadAlgorithms::ChaCha20Poly1305 => CKM_CHACHA20_POLY1305,
+        })
+    }
+}
+
 pub struct Aead {
     mode: Mode,
     ctx: Context,
@@ -71,34 +82,6 @@ pub struct Aead {
 }
 
 impl Aead {
-    fn mech(algorithm: AeadAlgorithms) -> p11::CK_MECHANISM_TYPE {
-        CK_MECHANISM_TYPE::from(match algorithm {
-            crate::aead::AeadAlgorithms::Aes128Gcm | crate::aead::AeadAlgorithms::Aes256Gcm => {
-                CKM_AES_GCM
-            }
-            crate::aead::AeadAlgorithms::ChaCha20Poly1305 => CKM_CHACHA20_POLY1305,
-        })
-    }
-
-    pub fn import_key(algorithm: AeadAlgorithms, key: &[u8]) -> Result<SymKey> {
-        let slot = p11::Slot::internal().map_err(|_| crate::Error::InternalError)?;
-
-        let key_item = SECItemBorrowed::wrap(key);
-        let key_item_ptr = key_item.as_ref() as *const _ as *mut _;
-
-        let ptr = unsafe {
-            p11::PK11_ImportSymKey(
-                *slot,
-                Self::mech(algorithm),
-                p11::PK11Origin::PK11_OriginUnwrap,
-                p11::CK_ATTRIBUTE_TYPE::from(p11::CKA_ENCRYPT | p11::CKA_DECRYPT),
-                key_item_ptr,
-                std::ptr::null_mut(),
-            )
-        };
-        unsafe { SymKey::from_ptr(ptr) }
-    }
-
     pub fn new(
         mode: Mode,
         algorithm: AeadAlgorithms,
@@ -109,7 +92,7 @@ impl Aead {
 
         let ptr = unsafe {
             PK11_CreateContextBySymKey(
-                Self::mech(algorithm),
+                algorithm.into(),
                 mode.p11mode(),
                 **key,
                 SECItemBorrowed::wrap(&nonce_base[..]).as_ref(),
@@ -196,6 +179,8 @@ impl Aead {
 
 #[cfg(test)]
 mod test {
+    use crate::{p11, SymKey};
+
     use super::{super::init, Aead, AeadAlgorithms, Mode, SequenceNumber, NONCE_LEN};
 
     /// Check that the first invocation of encryption matches expected values.
@@ -209,7 +194,7 @@ mod test {
         ct: &[u8],
     ) {
         init();
-        let k = Aead::import_key(algorithm, key).unwrap();
+        let k = p11::SymKey::import(key, algorithm).unwrap();
 
         let mut enc = Aead::new(Mode::Encrypt, algorithm, &k, *nonce).unwrap();
         let ciphertext = enc.seal(aad, pt).unwrap();
@@ -229,7 +214,7 @@ mod test {
         pt: &[u8],
         ct: &[u8],
     ) {
-        let k = Aead::import_key(algorithm, key).unwrap();
+        let k = SymKey::import(key, algorithm).unwrap();
         let mut dec = Aead::new(Mode::Decrypt, algorithm, &k, *nonce).unwrap();
         let plaintext = dec.open(aad, seq, ct).unwrap();
         assert_eq!(&plaintext[..], pt);

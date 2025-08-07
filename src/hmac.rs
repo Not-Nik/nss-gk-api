@@ -7,7 +7,6 @@
 #![allow(non_camel_case_types)]
 
 use crate::err::IntoResult;
-use crate::hash;
 use crate::hash::HashAlgorithm;
 use crate::p11;
 use crate::p11::PK11Origin;
@@ -26,34 +25,41 @@ use std::ptr;
 // Constants
 //
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HmacAlgorithm {
     HMAC_SHA2_256,
     HMAC_SHA2_384,
     HMAC_SHA2_512,
 }
 
-fn hmac_alg_to_ckm(alg: &HmacAlgorithm) -> p11::CK_MECHANISM_TYPE {
-    match alg {
-        HmacAlgorithm::HMAC_SHA2_256 => p11::CKM_SHA256_HMAC.into(),
-        HmacAlgorithm::HMAC_SHA2_384 => p11::CKM_SHA384_HMAC.into(),
-        HmacAlgorithm::HMAC_SHA2_512 => p11::CKM_SHA512_HMAC.into(),
+impl HmacAlgorithm {
+    pub fn len(&self) -> usize {
+        let hash_alg: HashAlgorithm = (*self).into();
+        hash_alg.len()
     }
 }
 
-pub fn hmac_alg_to_hash_alg(alg: &HmacAlgorithm) -> Result<HashAlgorithm> {
-    match alg {
-        HmacAlgorithm::HMAC_SHA2_256 => Ok(HashAlgorithm::SHA2_256),
-        HmacAlgorithm::HMAC_SHA2_384 => Ok(HashAlgorithm::SHA2_384),
-        HmacAlgorithm::HMAC_SHA2_512 => Ok(HashAlgorithm::SHA2_512),
+impl Into<p11::CK_MECHANISM_TYPE> for HmacAlgorithm {
+    fn into(self) -> p11::CK_MECHANISM_TYPE {
+        match self {
+            HmacAlgorithm::HMAC_SHA2_256 => p11::CKM_SHA256_HMAC.into(),
+            HmacAlgorithm::HMAC_SHA2_384 => p11::CKM_SHA384_HMAC.into(),
+            HmacAlgorithm::HMAC_SHA2_512 => p11::CKM_SHA512_HMAC.into(),
+        }
     }
 }
 
-pub fn hmac_alg_to_hmac_len(alg: &HmacAlgorithm) -> Result<usize> {
-    let hash_alg = hmac_alg_to_hash_alg(&alg)?;
-    hash::hash_alg_to_hash_len(&hash_alg)
+impl Into<HashAlgorithm> for HmacAlgorithm {
+    fn into(self) -> HashAlgorithm {
+        match self {
+            HmacAlgorithm::HMAC_SHA2_256 => HashAlgorithm::SHA2_256,
+            HmacAlgorithm::HMAC_SHA2_384 => HashAlgorithm::SHA2_384,
+            HmacAlgorithm::HMAC_SHA2_512 => HashAlgorithm::SHA2_512,
+        }
+    }
 }
 
-pub fn hmac(alg: &HmacAlgorithm, key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
+pub fn hmac(alg: HmacAlgorithm, key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
     crate::init();
 
     let data_len = match u32::try_from(data.len()) {
@@ -65,7 +71,7 @@ pub fn hmac(alg: &HmacAlgorithm, key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
     let sym_key = unsafe {
         PK11_ImportSymKey(
             *slot,
-            hmac_alg_to_ckm(&alg),
+            alg.into(),
             PK11Origin::PK11_OriginUnwrap,
             CKA_SIGN,
             SECItemBorrowed::wrap(key).as_mut(),
@@ -75,11 +81,10 @@ pub fn hmac(alg: &HmacAlgorithm, key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
     };
     let param = SECItemBorrowed::make_empty();
     let context = unsafe {
-        PK11_CreateContextBySymKey(hmac_alg_to_ckm(&alg), CKA_SIGN, *sym_key, param.as_ref())
-            .into_result()?
+        PK11_CreateContextBySymKey(alg.into(), CKA_SIGN, *sym_key, param.as_ref()).into_result()?
     };
     unsafe { PK11_DigestOp(*context, data.as_ptr(), data_len).into_result()? };
-    let expected_len = hmac_alg_to_hmac_len(alg)?;
+    let expected_len = alg.len();
     let mut digest = vec![0u8; expected_len];
     let mut digest_len = 0u32;
     unsafe {
